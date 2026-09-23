@@ -17,8 +17,8 @@
   --ink:#E7E4DC;
   --muted:#8B93A1;
   --muted-2:#5B6472;
-  --amber:#E2B04A;
-  --amber-dim:#5C4A28;
+  --amber:#4FA8A0;
+  --amber-dim:#1E3D3A;
   --green:#5FB894;
   --green-dim:#233A32;
   --rose:#C9695C;
@@ -126,7 +126,7 @@ body{
 
 .now-eyebrow{display:flex; align-items:center; gap:8px; font-size:12px; color:var(--amber); font-weight:700; margin-bottom:8px;}
 .pulse-dot{width:8px; height:8px; border-radius:50%; background:var(--amber); animation:pulse 1.6s ease-in-out infinite;}
-@keyframes pulse{0%,100%{opacity:1; box-shadow:0 0 0 0 rgba(226,176,74,.5);} 50%{opacity:.55; box-shadow:0 0 0 6px rgba(226,176,74,0);}}
+@keyframes pulse{0%,100%{opacity:1; box-shadow:0 0 0 0 rgba(79,168,160,.5);} 50%{opacity:.55; box-shadow:0 0 0 6px rgba(79,168,160,0);}}
 .now-title{font-size:20px; font-weight:800; margin:0; text-align:center; width:100%;}
 .now-top{position:relative; display:flex; align-items:center; justify-content:center; margin-bottom:10px; min-height:32px;}
 /* title shares the top row with the "جارٍ الآن" label */
@@ -231,7 +231,7 @@ body{
   box-shadow:3px 3px 0 rgba(0,0,0,.4);
 }
 .btn:active{transform:translate(3px,3px); box-shadow:0 0 0 rgba(0,0,0,0);}
-.btn-primary{background:var(--amber); color:#1A1305;}
+.btn-primary{background:var(--amber); color:#07211D;}
 .btn-primary:hover{filter:brightness(1.08);}
 .btn-ghost{background:var(--surface-3); color:var(--ink); border:1px solid var(--border);}
 .btn-ghost:hover{background:#333c4a;}
@@ -294,7 +294,7 @@ body{
   padding:4px 10px 4px 6px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
   display:inline-flex; align-items:center; gap:7px;
 }
-.memo-go::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--amber); flex-shrink:0; box-shadow:0 0 0 3px rgba(226,176,74,.15);}
+.memo-go::before{content:''; width:7px; height:7px; border-radius:50%; background:var(--amber); flex-shrink:0; box-shadow:0 0 0 3px rgba(79,168,160,.15);}
 .memo-x{
   background:none; border:none; color:var(--muted-2); cursor:pointer; font-size:12px; line-height:1;
   padding:4px 8px 4px 7px; border-inline-end:1px solid var(--border);
@@ -520,7 +520,7 @@ body{
   box-shadow:2px 2px 0 rgba(0,0,0,.35); transition:transform .08s, box-shadow .08s;
 }
 .mode-tab:active{transform:translate(2px,2px); box-shadow:0 0 0 rgba(0,0,0,0);}
-.mode-tab.active{background:var(--amber); color:#1A1305; border-color:var(--amber); box-shadow:0 0 0 3px rgba(226,176,74,.18), 2px 2px 0 rgba(0,0,0,.35);}
+.mode-tab.active{background:var(--amber); color:#07211D; border-color:var(--amber); box-shadow:0 0 0 3px rgba(79,168,160,.18), 2px 2px 0 rgba(0,0,0,.35);}
 .mode-tab:disabled{opacity:.4; cursor:default; border-style:dashed; box-shadow:none;}
 
 @media (min-width:600px){
@@ -553,6 +553,7 @@ body{
     <div class="auth-sub" id="authSub">سجّل الدخول لمزامنة مهامك عبر أجهزتك</div>
     <input type="email" class="name-input" id="authEmail" placeholder="البريد الإلكتروني" autocomplete="email">
     <input type="password" class="name-input" id="authPass" placeholder="كلمة المرور" autocomplete="current-password">
+    <input type="password" class="name-input" id="authPass2" placeholder="تأكيد كلمة المرور" autocomplete="new-password" style="display:none;">
     <div class="auth-err" id="authErr" style="display:none;"></div>
     <button class="btn btn-primary btn-block" id="authSubmit">تسجيل الدخول</button>
     <button class="auth-toggle" id="authToggleMode">ليس لديك حساب؟ إنشاء حساب جديد</button>
@@ -833,19 +834,26 @@ if(fbReady){
     document.getElementById('authSub').textContent = authMode==='login' ? 'سجّل الدخول لمزامنة مهامك عبر أجهزتك' : 'أنشئ حسابًا لحفظ مهامك ومزامنتها';
     document.getElementById('authSubmit').textContent = authMode==='login' ? 'تسجيل الدخول' : 'إنشاء حساب';
     document.getElementById('authToggleMode').textContent = authMode==='login' ? 'ليس لديك حساب؟ إنشاء حساب جديد' : 'لديك حساب بالفعل؟ تسجيل الدخول';
+    document.getElementById('authPass2').style.display = authMode==='signup' ? '' : 'none';
+    document.getElementById('authPass2').value = '';
     authSetError(null);
   };
   document.getElementById('authSubmit').onclick = ()=>{
     const email = document.getElementById('authEmail').value.trim();
     const pass = document.getElementById('authPass').value;
     if(!email || !pass){ authSetError('أدخل البريد الإلكتروني وكلمة المرور'); return; }
+    if(authMode==='signup'){
+      const pass2 = document.getElementById('authPass2').value;
+      if(!pass2){ authSetError('أكّد كلمة المرور'); return; }
+      if(pass !== pass2){ authSetError('كلمتا المرور غير متطابقتين'); return; }
+    }
     authSetError(null);
     const action = authMode==='login'
       ? fbAuth.signInWithEmailAndPassword(email, pass)
       : fbAuth.createUserWithEmailAndPassword(email, pass);
     action.catch(err=> authSetError(authFriendlyError(err)));
   };
-  ['authEmail','authPass'].forEach(id=>{
+  ['authEmail','authPass','authPass2'].forEach(id=>{
     document.getElementById(id).addEventListener('keydown', e=>{ if(e.key==='Enter') document.getElementById('authSubmit').click(); });
   });
   fbAuth.onAuthStateChanged(user=>{
@@ -1048,7 +1056,7 @@ function resumeFromEmpty(id){
 }
 
 /* ===================== charts ===================== */
-const CH_COLORS = ['#E2B04A','#6C9BD1','#5FB894','#C9695C','#A58BD6','#4FB3B3'];
+const CH_COLORS = ['#4FA8A0','#6C9BD1','#5FB894','#C9695C','#A58BD6','#4FB3B3'];
 const AR_WD = ['أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة','سبت'];
 const svgNS = 'xmlns="http://www.w3.org/2000/svg"';
 
@@ -1203,9 +1211,9 @@ function chartFocusMix(day, segs){
   const tot = closed + b.live || 1;
   const parts = [
     {k:'deep', l:'تركيز عميق', sub:`${FOCUS_DEEP}د فأكثر`, c:'var(--amber)'},
-    {k:'mid',  l:'متوسط', sub:`${FOCUS_MID}–${FOCUS_DEEP}د`, c:'rgba(226,176,74,.45)'},
+    {k:'mid',  l:'متوسط', sub:`${FOCUS_MID}–${FOCUS_DEEP}د`, c:'rgba(79,168,160,.45)'},
     {k:'frag', l:'متقطع', sub:`أقل من ${FOCUS_MID}د`, c:'var(--rose)'},
-    {k:'live', l:'جارية', sub:'لم تُحسم بعد', c:'rgba(226,176,74,.18)'},
+    {k:'live', l:'جارية', sub:'لم تُحسم بعد', c:'rgba(79,168,160,.18)'},
   ].filter(p=> p.k!=='live' || cnt.live);
   const pct = k => Math.round(b[k]/tot*100);
   const deepP = closed ? Math.round(b.deep/closed*100) : 0;
