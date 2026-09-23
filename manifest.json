@@ -1,0 +1,19 @@
+{
+  "name": "نشاط — سجلّ العمل اليومي",
+  "short_name": "نشاط",
+  "description": "تطبيق شخصي لتسجيل الأنشطة والمهام اليومية بالوقت، مع دعم المزامنة والحسابات",
+  "start_url": "./index.html",
+  "scope": "./",
+  "id": "./",
+  "display": "standalone",
+  "background_color": "#12151A",
+  "theme_color": "#12151A",
+  "orientation": "portrait",
+  "dir": "rtl",
+  "lang": "ar",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
