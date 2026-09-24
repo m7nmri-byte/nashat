@@ -923,9 +923,9 @@ try{
   }
 }catch(e){ console.warn('Firebase unavailable, using local storage only:', e); }
 
-function fbPush(tasks){
+function fbPush(){
   if(!fbReady || !fbDocRef) return;
-  fbDocRef.set({ tasks, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
+  fbDocRef.set({ tasks: TASKS, memo: MEMO, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
     .catch(e=> console.warn('Firestore write failed:', e));
 }
 function fbListen(){
@@ -933,15 +933,14 @@ function fbListen(){
   if(fbUnsub) fbUnsub();
   fbUnsub = fbDocRef.onSnapshot(doc=>{
     if(!doc.exists){
-      fbPush(TASKS); // first login: seed the cloud with whatever is on this device
+      fbPush(); // first login: seed the cloud with whatever is on this device
       return;
     }
     const data = doc.data();
-    if(Array.isArray(data.tasks)){
-      TASKS = data.tasks;
-      saveTasks(TASKS);
-      render();
-    }
+    let changed = false;
+    if(Array.isArray(data.tasks)){ TASKS = data.tasks; saveTasks(TASKS); changed = true; }
+    if(Array.isArray(data.memo)){ MEMO = data.memo; saveMemo(); changed = true; }
+    if(changed) render();
   }, err=> console.warn('Firestore listen failed:', err));
 }
 
@@ -952,7 +951,7 @@ let currentView = 'log'; // 'log' | 'stats'
 function persist(){
   saveTasks(TASKS);
   render();
-  fbPush(TASKS);
+  fbPush();
 }
 
 /* ---- auth screen wiring ---- */
@@ -1913,7 +1912,7 @@ function loadMemo(){
   catch(e){ return []; }
 }
 let MEMO = loadMemo();
-function saveMemo(){ try{ localStorage.setItem(MEMO_KEY, JSON.stringify(MEMO)); }catch(e){} }
+function saveMemo(){ try{ localStorage.setItem(MEMO_KEY, JSON.stringify(MEMO)); }catch(e){} fbPush(); }
 function addMemo(text){
   // pasting several lines adds several points at once
   const parts = String(text).split(/\n+/).map(x=>x.replace(/^\s*[-•*·]\s*/,'').trim()).filter(Boolean);
