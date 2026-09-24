@@ -1585,7 +1585,7 @@ function chartPeakHours(day){
   let g = '';
   rows.forEach((r,ri)=>{
     const y = top + ri*(ch+cellGap), isSel = r.d===day;
-    g += `<text x="${W-4}" y="${y+ch/2+3.5}" text-anchor="end" class="ch-axis${isSel?' sel':''}">${r.wd}</text>`;
+    g += `<text x="${W-lblW/2}" y="${y+ch/2+3.5}" text-anchor="middle" class="ch-axis${isSel?' sel':''}">${r.wd}</text>`;
     for(let h=h0; h<h1; h++){
       const m = r.hrs[h], x = W - lblW - (h-h0+1)*cw;
       const op = m <= 0 ? 0 : .18 + .82*Math.min(1, m/60);
