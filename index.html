@@ -919,6 +919,11 @@ try{
     firebase.initializeApp(firebaseConfig);
     fbAuth = firebase.auth();
     fbDb = firebase.firestore();
+    // Without this, a write still "in flight" to the server is only held in
+    // memory — refreshing the page right after finishing a task can lose it
+    // entirely, and the next snapshot then overwrites the good local copy
+    // with the older server version. Persistence queues writes on disk.
+    fbDb.enablePersistence({synchronizeTabs:true}).catch(()=>{});
     fbReady = true;
   }
 }catch(e){ console.warn('Firebase unavailable, using local storage only:', e); }
@@ -928,15 +933,31 @@ function fbPush(){
   fbDocRef.set({ tasks: TASKS, memo: MEMO, updatedAt: firebase.firestore.FieldValue.serverTimestamp() })
     .catch(e=> console.warn('Firestore write failed:', e));
 }
+function taskMetric(tasks){
+  // rough "how much is recorded" size: segments + steps across all tasks
+  return tasks.reduce((n,t)=> n + (t.segments?t.segments.length:0) + (t.steps?t.steps.length:0), 0);
+}
 function fbListen(){
   if(!fbReady || !fbDocRef) return;
   if(fbUnsub) fbUnsub();
+  let firstSnapshot = true;
   fbUnsub = fbDocRef.onSnapshot(doc=>{
     if(!doc.exists){
       fbPush(); // first login: seed the cloud with whatever is on this device
+      firstSnapshot = false;
       return;
     }
     const data = doc.data();
+    // Only right after (re)connecting: a write made just before a refresh can
+    // still be "in flight" and missing from this first snapshot. If it looks
+    // less complete than what's already saved on this device, trust the
+    // device and re-push it, instead of silently erasing recent work.
+    if(firstSnapshot && Array.isArray(data.tasks) && taskMetric(data.tasks) < taskMetric(TASKS)){
+      firstSnapshot = false;
+      fbPush();
+      return;
+    }
+    firstSnapshot = false;
     let changed = false;
     if(Array.isArray(data.tasks) && JSON.stringify(data.tasks) !== JSON.stringify(TASKS)){
       TASKS = data.tasks;
