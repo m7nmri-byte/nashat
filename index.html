@@ -328,19 +328,31 @@ body{
 
 .fs-timer{
   position:fixed; inset:0; z-index:200; background:var(--bg);
+  display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.fs-inner{
   display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px;
+  width:100%; height:100%; transition:transform .25s ease;
+}
+.fs-timer.rotated .fs-inner{
+  width:100vh; height:100vw;
+  transform:rotate(90deg);
 }
 .fs-name{font-size:22px; font-weight:800; color:var(--ink); text-align:center; max-width:90vw;}
 .fs-clock{max-width:640px; gap:2%;}
 .fs-clock .flip-tile{max-width:96px; font-size:clamp(28px, 12vw, 68px); border-radius:16%;}
 .fs-clock .flip-colon{font-size:clamp(22px, 9vw, 50px);}
 .fs-sub{font-size:13px; color:var(--muted);}
-.fs-close{
-  position:absolute; top:20px; inset-inline-end:20px;
+.fs-close, .fs-rotate{
+  position:absolute; top:20px;
   width:40px; height:40px; border-radius:50%; background:var(--surface); border:1px solid var(--border);
-  color:var(--muted); font-size:16px; cursor:pointer; box-shadow:2px 2px 0 rgba(0,0,0,.4);
+  color:var(--muted); font-size:16px; cursor:pointer; box-shadow:2px 2px 0 rgba(0,0,0,.4); z-index:1;
+  display:flex; align-items:center; justify-content:center;
 }
-.fs-close:hover{color:var(--ink); border-color:var(--muted-2);}
+.fs-close{inset-inline-end:20px;}
+.fs-rotate{inset-inline-start:20px;}
+.fs-close:hover, .fs-rotate:hover{color:var(--ink); border-color:var(--muted-2);}
+.fs-rotate.active{color:var(--amber); border-color:var(--amber);}
 .ch-block{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px 16px 18px;}
 .ch-block h3{font-size:12px; font-weight:800; color:var(--muted); margin:0 0 14px; letter-spacing:.2px; text-align:center;}
 .ch-svg{width:100%; height:auto; display:block; overflow:visible;}
@@ -786,9 +798,14 @@ if('serviceWorker' in navigator){
 
 <div class="fs-timer" id="fsTimer" style="display:none;">
   <button class="fs-close" id="fsClose" title="إغلاق">✕</button>
-  <div class="fs-name" id="fsName"></div>
-  <div class="flip-clock fs-clock" id="fsClock"></div>
-  <div class="fs-sub" id="fsSub"></div>
+  <button class="fs-rotate" id="fsRotate" title="تدوير أفقي">
+    <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6"></path><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path></svg>
+  </button>
+  <div class="fs-inner" id="fsInner">
+    <div class="fs-name" id="fsName"></div>
+    <div class="flip-clock fs-clock" id="fsClock"></div>
+    <div class="fs-sub" id="fsSub"></div>
+  </div>
 </div>
 
 <script>
@@ -2027,11 +2044,25 @@ function openFullscreenTimer(taskId){
 function closeFullscreenTimer(){
   _fsTaskId = null;
   document.getElementById('fsTimer').style.display = 'none';
+  document.getElementById('fsTimer').classList.remove('rotated');
+  document.getElementById('fsRotate').classList.remove('active');
+  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
   if(document.fullscreenElement && document.exitFullscreen){
     document.exitFullscreen().catch(()=>{});
   }
 }
 document.getElementById('fsClose').addEventListener('click', closeFullscreenTimer);
+document.getElementById('fsRotate').addEventListener('click', ()=>{
+  const fs = document.getElementById('fsTimer');
+  const on = fs.classList.toggle('rotated');
+  document.getElementById('fsRotate').classList.toggle('active', on);
+  try{
+    if(screen.orientation && screen.orientation.lock){
+      if(on) screen.orientation.lock('landscape').catch(()=>{});
+      else screen.orientation.unlock && screen.orientation.unlock();
+    }
+  }catch(e){}
+});
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _fsTaskId) closeFullscreenTimer(); });
 document.addEventListener('fullscreenchange', ()=>{
   if(!document.fullscreenElement && _fsTaskId) closeFullscreenTimer();
