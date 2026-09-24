@@ -1399,7 +1399,7 @@ function chartFocusMix(day, segs){
 /* 3) Open loops */
 function chartOpenLoops(){
   const pend = pendingTasks();
-  if(!pend.length) return take('لا توجد حلقات مفتوحة — كل ما بدأته إمّا أُنجز أو جارٍ الآن', 'good');
+  if(!pend.length) return chartEmpty('لا توجد حلقات مفتوحة');
   const now = Date.now();
   const items = pend.map(t=>({t, age:(now - new Date(lastSegment(t).end).getTime())/3600000, inv: taskTotalMs(t)/60000}))
                     .sort((a,b)=>b.age-a.age);
