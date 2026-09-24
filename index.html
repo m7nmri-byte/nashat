@@ -325,6 +325,22 @@ body{
 }
 .bn-tab.active{color:var(--amber);}
 .bn-tab:hover{color:var(--muted);}
+
+.fs-timer{
+  position:fixed; inset:0; z-index:200; background:var(--bg);
+  display:flex; flex-direction:column; align-items:center; justify-content:center; gap:22px; padding:24px;
+}
+.fs-name{font-size:22px; font-weight:800; color:var(--ink); text-align:center; max-width:90vw;}
+.fs-clock{max-width:640px; gap:2%;}
+.fs-clock .flip-tile{max-width:96px; font-size:clamp(28px, 12vw, 68px); border-radius:16%;}
+.fs-clock .flip-colon{font-size:clamp(22px, 9vw, 50px);}
+.fs-sub{font-size:13px; color:var(--muted);}
+.fs-close{
+  position:absolute; top:20px; inset-inline-end:20px;
+  width:40px; height:40px; border-radius:50%; background:var(--surface); border:1px solid var(--border);
+  color:var(--muted); font-size:16px; cursor:pointer; box-shadow:2px 2px 0 rgba(0,0,0,.4);
+}
+.fs-close:hover{color:var(--ink); border-color:var(--muted-2);}
 .ch-block{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px 16px 18px;}
 .ch-block h3{font-size:12px; font-weight:800; color:var(--muted); margin:0 0 14px; letter-spacing:.2px; text-align:center;}
 .ch-svg{width:100%; height:auto; display:block; overflow:visible;}
@@ -767,6 +783,13 @@ if('serviceWorker' in navigator){
 </div>
 
 <div class="toast" id="toast"></div>
+
+<div class="fs-timer" id="fsTimer" style="display:none;">
+  <button class="fs-close" id="fsClose" title="إغلاق">✕</button>
+  <div class="fs-name" id="fsName"></div>
+  <div class="flip-clock fs-clock" id="fsClock"></div>
+  <div class="fs-sub" id="fsSub"></div>
+</div>
 
 <script>
 (function(){
@@ -1632,7 +1655,8 @@ function render(){
   if(currentView !== 'log') return;
 
   document.querySelectorAll('.tl-edit').forEach(b=>{
-    b.onclick = ()=> openStatusEdit(b.dataset.task);
+    if(b.dataset.fullscreen) b.onclick = ()=> openFullscreenTimer(b.dataset.fullscreen);
+    else b.onclick = ()=> openStatusEdit(b.dataset.task);
   });
   wireMemo(app);
 
@@ -1672,6 +1696,9 @@ function renderNowCard(t, isLast){
       <div class="now-eyebrow"><span class="pulse-dot"></span> جارٍ الآن</div>
       <div class="now-top">
         <div class="now-title">${escapeHtml(t.name)}</div>
+        <button class="tl-edit" data-fullscreen="${t.id}" title="ملء الشاشة" style="inset-inline-end:34px;">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
+        </button>
         <button class="tl-edit" data-task="${t.id}" title="تعديل الاسم">✎</button>
       </div>
       ${isResumed ? `<div class="now-thread">استكمال ${t.segments.length - 1}</div>` : ''}
@@ -1735,22 +1762,24 @@ function updateLiveNumbers(){
   if(dt){ const v = fmtHM(dayStats(selectedDay).totalMs); if(dt.textContent !== v) dt.textContent = v; }
   activeTasks().forEach(t=>{
     const seg = lastSegment(t);
-    const container = document.querySelector(`[data-clock="${t.id}"]`);
-    if(container){
+    const containers = document.querySelectorAll(`[data-clock="${t.id}"]`);
+    if(containers.length){
       const str = fmtDurLong(new Date() - new Date(seg.start));
       const newChars = str.split('').filter(c=>c!==':');
       const litFrom = flipLitFrom(str);
-      const tiles = container.querySelectorAll('.flip-tile');
-      container.querySelectorAll('.flip-colon').forEach((c, ci)=> c.classList.toggle('lit', (ci+1)*2 > litFrom));
-      newChars.forEach((ch, i)=>{
-        const tile = tiles[i];
-        if(tile) tile.classList.toggle('lit', i >= litFrom);
-        if(tile && tile.textContent !== ch){
-          tile.textContent = ch;
-          tile.classList.remove('tick');
-          void tile.offsetWidth;
-          tile.classList.add('tick');
-        }
+      containers.forEach(container=>{
+        container.querySelectorAll('.flip-colon').forEach((c, ci)=> c.classList.toggle('lit', (ci+1)*2 > litFrom));
+        const tiles = container.querySelectorAll('.flip-tile');
+        newChars.forEach((ch, i)=>{
+          const tile = tiles[i];
+          if(tile) tile.classList.toggle('lit', i >= litFrom);
+          if(tile && tile.textContent !== ch){
+            tile.textContent = ch;
+            tile.classList.remove('tick');
+            void tile.offsetWidth;
+            tile.classList.add('tick');
+          }
+        });
       });
     }
     const totEl = document.querySelector(`[data-total="${t.id}"]`);
@@ -1974,6 +2003,39 @@ function clearDayLog(day){
   TASKS = remaining;
   persist();
 }
+
+// Full-screen focus view for one task's timer. Requests the real browser
+// Fullscreen API too where it's allowed (it silently no-ops inside a
+// sandboxed iframe, e.g. the claude.ai artifact preview) — either way the
+// in-page overlay itself still fills the viewport.
+let _fsTaskId = null;
+function openFullscreenTimer(taskId){
+  const t = TASKS.find(x=>x.id===taskId);
+  if(!t || t.status!=='active') return;
+  _fsTaskId = taskId;
+  const seg = lastSegment(t);
+  document.getElementById('fsName').textContent = t.name;
+  const clock = document.getElementById('fsClock');
+  clock.setAttribute('data-clock', taskId);
+  clock.innerHTML = flipClockHTML(new Date() - new Date(seg.start));
+  document.getElementById('fsSub').textContent = 'بدأت الساعة ' + fmtTime(seg.start) + ' ' + fmtPeriod(seg.start);
+  document.getElementById('fsTimer').style.display = 'flex';
+  if(document.documentElement.requestFullscreen){
+    document.documentElement.requestFullscreen().catch(()=>{});
+  }
+}
+function closeFullscreenTimer(){
+  _fsTaskId = null;
+  document.getElementById('fsTimer').style.display = 'none';
+  if(document.fullscreenElement && document.exitFullscreen){
+    document.exitFullscreen().catch(()=>{});
+  }
+}
+document.getElementById('fsClose').addEventListener('click', closeFullscreenTimer);
+document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _fsTaskId) closeFullscreenTimer(); });
+document.addEventListener('fullscreenchange', ()=>{
+  if(!document.fullscreenElement && _fsTaskId) closeFullscreenTimer();
+});
 
 document.querySelectorAll('[data-close]').forEach(b=>{
   b.addEventListener('click', ()=>{
