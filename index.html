@@ -938,9 +938,21 @@ function fbListen(){
     }
     const data = doc.data();
     let changed = false;
-    if(Array.isArray(data.tasks)){ TASKS = data.tasks; saveTasks(TASKS); changed = true; }
-    if(Array.isArray(data.memo)){ MEMO = data.memo; saveMemo(); changed = true; }
-    if(changed) render();
+    if(Array.isArray(data.tasks) && JSON.stringify(data.tasks) !== JSON.stringify(TASKS)){
+      TASKS = data.tasks;
+      saveTasks(TASKS); // local cache only — never re-push what we just received
+      changed = true;
+    }
+    if(Array.isArray(data.memo) && JSON.stringify(data.memo) !== JSON.stringify(MEMO)){
+      MEMO = data.memo;
+      try{ localStorage.setItem(MEMO_KEY, JSON.stringify(MEMO)); }catch(e){} // local cache only, same reason
+      changed = true;
+    }
+    if(!changed) return;
+    // don't yank the DOM out from under someone who's mid-typing
+    const el = document.activeElement;
+    if(el && (el.tagName==='INPUT' || el.tagName==='TEXTAREA')) return;
+    render();
   }, err=> console.warn('Firestore listen failed:', err));
 }
 
