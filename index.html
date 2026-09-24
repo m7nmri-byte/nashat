@@ -93,12 +93,6 @@ body{
 .topbar .datenav{margin-bottom:0; grid-column:1; grid-row:1; justify-self:start;}
 .topbar .brand{grid-column:2; grid-row:1; align-items:center; text-align:center;}
 .topbar .topbar-actions{grid-column:3; grid-row:1;}
-@media (max-width:560px){
-  .topbar{grid-template-columns:1fr auto; row-gap:12px;}
-  .topbar .brand{grid-column:1/-1; grid-row:1;}
-  .topbar .datenav{grid-column:1; grid-row:2;}
-  .topbar .topbar-actions{grid-column:2; grid-row:2;}
-}
 
 /* ---------- date nav ---------- */
 .datenav{
@@ -675,6 +669,52 @@ if('serviceWorker' in navigator){
   </div>
 </div>
 
+<div class="overlay" id="overlayTopMenu">
+  <div class="sheet">
+    <button class="option-btn" id="menuPrint">
+      <span class="ic">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polyline points="6 9 6 2 18 2 18 9"></polyline>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
+          <rect x="6" y="14" width="12" height="8"></rect>
+        </svg>
+      </span>
+      <span class="t"><span class="h">طباعة</span></span>
+    </button>
+    <button class="option-btn" id="menuImport">
+      <span class="ic">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="7 10 12 15 17 10"></polyline>
+          <line x1="12" y1="15" x2="12" y2="3"></line>
+        </svg>
+      </span>
+      <span class="t"><span class="h">استيراد</span></span>
+    </button>
+    <button class="option-btn" id="menuExport">
+      <span class="ic">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+          <polyline points="17 8 12 3 7 8"></polyline>
+          <line x1="12" y1="3" x2="12" y2="15"></line>
+        </svg>
+      </span>
+      <span class="t"><span class="h">تصدير</span></span>
+    </button>
+    <button class="option-btn" id="menuLogout" style="display:none;">
+      <span class="ic">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+          <polyline points="16 17 21 12 16 7"></polyline>
+          <line x1="21" y1="12" x2="9" y2="12"></line>
+        </svg>
+      </span>
+      <span class="t"><span class="h">تسجيل الخروج</span></span>
+    </button>
+    <button class="sheet-close" data-close>إلغاء</button>
+  </div>
+</div>
+
 <div class="overlay" id="overlayImport">
   <div class="sheet">
     <h3>استيراد بيانات</h3>
@@ -737,6 +777,14 @@ function addDays(dayStr, n){
   const d = new Date(dayStr+'T12:00:00');
   d.setDate(d.getDate()+n);
   return toDayStr(d);
+}
+function shortDayLabel(dayStr){
+  const t = todayStr();
+  if(dayStr === t) return 'اليوم';
+  if(dayStr === addDays(t,-1)) return 'أمس';
+  if(dayStr === addDays(t,1)) return 'غدًا';
+  const d = new Date(dayStr+'T12:00:00');
+  return d.toLocaleDateString('ar-SA-u-ca-gregory', {day:'numeric', month:'short'});
 }
 function toast(msg){
   const t = document.getElementById('toast');
@@ -1457,37 +1505,20 @@ function render(){
     <div class="topbar">
       <div class="brand">
         <div class="name">نشاط</div>
-        <div class="tag">سجلّ العمل اليومي</div>
       </div>
       <div class="datenav">
         <button id="dayPrev">‹</button>
         <div class="center" id="dayCenter">
-          <div class="lbl">${arDate(selectedDay)}</div>
-          <div class="sub">${isToday ? 'اليوم' : ''}</div>
+          <div class="lbl">${shortDayLabel(selectedDay)}</div>
         </div>
         <button id="dayNext" ${idx>=days.length-1 ? 'disabled':''}>›</button>
       </div>
       <div class="topbar-actions">
-        ${fbReady && fbAuth.currentUser ? `<button class="auth-logout" id="btnLogout">خروج</button>` : ''}
-        <button class="icon-btn" id="btnPrint" title="طباعة">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6 9 6 2 18 2 18 9"></polyline>
-            <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path>
-            <rect x="6" y="14" width="12" height="8"></rect>
-          </svg>
-        </button>
-        <button class="icon-btn" id="btnImport" title="استيراد">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="7 10 12 15 17 10"></polyline>
-            <line x1="12" y1="15" x2="12" y2="3"></line>
-          </svg>
-        </button>
-        <button class="icon-btn" id="btnExport" title="تصدير">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
-            <polyline points="17 8 12 3 7 8"></polyline>
-            <line x1="12" y1="3" x2="12" y2="15"></line>
+        <button class="icon-btn" id="btnMenu" title="خيارات">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <circle cx="12" cy="5" r="1.8"></circle>
+            <circle cx="12" cy="12" r="1.8"></circle>
+            <circle cx="12" cy="19" r="1.8"></circle>
           </svg>
         </button>
       </div>
@@ -1518,14 +1549,18 @@ function render(){
   document.getElementById('dayPrev').onclick = ()=>{ selectedDay = addDays(selectedDay,-1); render(); };
   document.getElementById('dayNext').onclick = ()=>{ if(idx<days.length-1){ selectedDay = addDays(selectedDay,1); render(); } };
   document.getElementById('dayCenter').onclick = ()=>{ selectedDay = todayStr(); render(); };
-  document.getElementById('btnPrint').onclick = ()=> window.print();
-  document.getElementById('btnImport').onclick = ()=> openOverlay('overlayImport');
-  const logoutBtn = document.getElementById('btnLogout');
-  if(logoutBtn) logoutBtn.onclick = ()=> fbAuth.signOut();
-  document.getElementById('btnExport').onclick = ()=>{
+  document.getElementById('btnMenu').onclick = ()=>{
+    document.getElementById('menuLogout').style.display = (fbReady && fbAuth.currentUser) ? '' : 'none';
+    openOverlay('overlayTopMenu');
+  };
+  document.getElementById('menuPrint').onclick = ()=>{ closeOverlay('overlayTopMenu'); window.print(); };
+  document.getElementById('menuImport').onclick = ()=>{ closeOverlay('overlayTopMenu'); openOverlay('overlayImport'); };
+  document.getElementById('menuExport').onclick = ()=>{
+    closeOverlay('overlayTopMenu');
     document.getElementById('exportDayLbl').textContent = arDate(selectedDay);
     openOverlay('overlayExport');
   };
+  document.getElementById('menuLogout').onclick = ()=>{ closeOverlay('overlayTopMenu'); fbAuth.signOut(); };
 
   document.querySelectorAll('.tl-edit').forEach(b=>{
     b.onclick = ()=> openStatusEdit(b.dataset.task);
