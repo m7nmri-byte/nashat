@@ -391,6 +391,11 @@ body{
 .ch-hrow .fill{display:block; height:100%; border-radius:999px; min-width:0;}
 .ch-hrow .v{text-align:start; color:var(--ink);}
 .ch-take{font-size:13px; color:var(--ink); line-height:1.85; margin:0 0 16px; opacity:.9;}
+.ch-stats{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
+.ch-stat{flex:1; min-width:78px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:9px 6px; text-align:center;}
+.ch-stat .n{font-size:15px; font-weight:800; color:var(--ink);}
+.ch-stat .l{font-size:10px; color:var(--muted-2); margin-top:2px;}
+.ch-cap{font-size:11.5px; color:var(--muted); text-align:center; margin-bottom:14px;}
 .ch-take.good{color:var(--green);}
 .ch-take .dim{color:var(--muted-2);}
 .ch-take b{font-weight:800;}
@@ -1353,6 +1358,10 @@ function ageText(h){
 function segMin(s){ return (s.b-s.a)/60000; }
 function isLive(s){ return s.status==='ongoing'; }
 function take(msg, cls){ return msg ? `<div class="ch-take${cls?' '+cls:''}">${msg}</div>` : ''; }
+function statRow(items, caption){
+  const row = `<div class="ch-stats">${items.map(i=>`<div class="ch-stat"><div class="n${i.word?'':' mono'}">${i.n}</div><div class="l">${i.l}</div></div>`).join('')}</div>`;
+  return row + (caption ? `<div class="ch-cap">${caption}</div>` : '');
+}
 
 /* 1) rhythm insight (above the Gantt strip) */
 function chartRhythmTake(day, segs){
@@ -1362,23 +1371,26 @@ function chartRhythmTake(day, segs){
   const union = unionIntervals(segs).reduce((a,[x,y])=>a+(y-x),0)/60000;
   const overlap = sum - union;
   const longest = segs.reduce((m,s)=> segMin(s) > segMin(m) ? s : m, segs[0]);
-  const longTxt = `«${escapeHtml(longest.task.name)}» لمدة <b class="mono">${minsLabel(segMin(longest))}</b>${isLive(longest)?' وما زالت مستمرة':''}`;
+  const longCaption = `«${escapeHtml(longest.task.name)}»${isLive(longest)?' — مستمرة الآن':''}`;
 
   if(segs.length===1){
-    return take(isLive(longest)
-      ? `جلسة واحدة متصلة ${today?'حتى الآن':''}: ${longTxt}`
-      : `جلسة واحدة فقط في هذا اليوم: ${longTxt}`);
+    return statRow([
+      {n: minsLabel(segMin(longest)), l: isLive(longest) ? (today?'مستمرة حتى الآن':'المدة') : 'جلسة واحدة'}
+    ], longCaption);
   }
   const switches = segs.length - 1;
-  let pace = '';
+  let paceLbl = null;
   if(union >= 60){
     const perH = switches / (union/60);
-    if(perH >= 3) pace = ` — إيقاع سريع (≈${Math.round(perH)} كل ساعة)`;
-    else if(perH <= 1) pace = ' — إيقاع هادئ';
+    if(perH >= 3) paceLbl = 'سريع';
+    else if(perH <= 1) paceLbl = 'هادئ';
   }
-  const par = overlap >= 5 ? ` · عملت بالتوازي <b class="mono">${minsLabel(overlap)}</b>` : '';
-  const longLbl = segMin(longest) >= FOCUS_MID ? 'أطول تركيز متصل' : 'أطول جلسة';
-  return take(`${arCount(switches, F_SWITCH)} بين المهام${pace}${par}<br>${longLbl}: ${longTxt}`);
+  const longLbl = segMin(longest) >= FOCUS_MID ? 'أطول تركيز' : 'أطول جلسة';
+  const stats = [{n: switches, l: 'تنقّلات'}];
+  if(paceLbl) stats.push({n: paceLbl, l: 'الإيقاع', word:true});
+  if(overlap >= 5) stats.push({n: minsLabel(overlap), l: 'بالتوازي'});
+  stats.push({n: minsLabel(segMin(longest)), l: longLbl});
+  return statRow(stats, longCaption);
 }
 
 /* 2) Focus vs fragments */
