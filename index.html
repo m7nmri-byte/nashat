@@ -1513,6 +1513,8 @@ function chartPeakHours(day){
     });
     return {d, hrs, wd:AR_WD[new Date(d+'T12:00:00').getDay()]};
   });
+  const WEEK_ORDER = ['سبت','أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة'];
+  rows.sort((a,b)=> WEEK_ORDER.indexOf(a.wd) - WEEK_ORDER.indexOf(b.wd));
   const colSum = new Array(24).fill(0);
   rows.forEach(r=> r.hrs.forEach((m,h)=> colSum[h]+=m));
   const used = colSum.map((m,h)=>m>0?h:-1).filter(h=>h>=0);
