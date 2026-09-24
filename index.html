@@ -308,11 +308,23 @@ body{
 .section-head h2{font-size:14px; font-weight:700; color:var(--muted); margin:0; letter-spacing:.2px;}
 .section-head .count{font-size:12px; color:var(--muted-2);}
 
-.timeline{display:flex; flex-direction:column; gap:0; align-self:start; min-width:0;}
-.lower{display:grid; grid-template-columns:1fr 1fr; gap:32px; margin-top:22px; align-items:start;}
-@media (max-width:640px){ .lower{grid-template-columns:1fr;} }
+.timeline{display:flex; flex-direction:column; gap:0; align-self:start; min-width:0; margin-top:22px;}
 /* ---------- charts ---------- */
-.charts{display:flex; flex-direction:column; gap:18px; min-width:0;}
+.charts{display:flex; flex-direction:column; gap:18px; min-width:0; margin-top:4px;}
+
+.bottom-nav{
+  position:fixed; left:0; right:0; bottom:0; z-index:40;
+  display:flex; background:var(--surface); border-top:1px solid var(--border);
+  padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  box-shadow:0 -3px 0 rgba(0,0,0,.35);
+}
+.bn-tab{
+  flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
+  background:none; border:none; color:var(--muted-2); font-family:inherit; font-size:11px; font-weight:700;
+  padding:6px 0; cursor:pointer; transition:color .15s;
+}
+.bn-tab.active{color:var(--amber);}
+.bn-tab:hover{color:var(--muted);}
 .ch-block{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius-lg); padding:16px 16px 18px;}
 .ch-block h3{font-size:12px; font-weight:800; color:var(--muted); margin:0 0 14px; letter-spacing:.2px; text-align:center;}
 .ch-svg{width:100%; height:auto; display:block; overflow:visible;}
@@ -854,6 +866,7 @@ function fbListen(){
 
 let TASKS = loadTasks();
 let selectedDay = todayStr();
+let currentView = 'log'; // 'log' | 'stats'
 
 function persist(){
   saveTasks(TASKS);
@@ -1501,7 +1514,7 @@ function render(){
   const stats = dayStats(selectedDay);
   const pend = pendingTasks();
 
-  app.innerHTML = `
+  const topbarHTML = `
     <div class="topbar">
       <div class="brand">
         <div class="name">نشاط</div>
@@ -1523,7 +1536,9 @@ function render(){
         </button>
       </div>
     </div>
+  `;
 
+  const logHTML = `
     ${acts.length ? `<div class="now-wrap ${acts.length>1?'dual':''}">${acts.map((t,i)=>renderNowCard(t, i===acts.length-1)).join('')}</div>${acts.length>1 ? `<div class="dual-pending">${pendingStackHTML()}</div>` : ''}` : (isToday ? renderEmptyNow() : '')}
 
     ${memoHTML()}
@@ -1536,14 +1551,27 @@ function render(){
       </div>
     </div>
 
-    <div class="lower">
-      <div class="timeline" id="timeline">
-        ${rows.length ? rows.map(r=>renderTimelineItem(r)).join('') : '<div class="tl-empty">لا توجد مهام مسجّلة في هذا اليوم</div>'}
-      </div>
-      <aside class="charts" id="charts">${chartsHTML(selectedDay)}</aside>
+    <div class="timeline" id="timeline">
+      ${rows.length ? rows.map(r=>renderTimelineItem(r)).join('') : '<div class="tl-empty">لا توجد مهام مسجّلة في هذا اليوم</div>'}
     </div>
-
   `;
+
+  const statsHTML = `<div class="charts" id="charts">${chartsHTML(selectedDay)}</div>`;
+
+  const navHTML = `
+    <div class="bottom-nav">
+      <button class="bn-tab ${currentView==='log'?'active':''}" id="navLog">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+        <span>اليوم</span>
+      </button>
+      <button class="bn-tab ${currentView==='stats'?'active':''}" id="navStats">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"></line><line x1="12" y1="20" x2="12" y2="4"></line><line x1="6" y1="20" x2="6" y2="14"></line></svg>
+        <span>الإحصاءات</span>
+      </button>
+    </div>
+  `;
+
+  app.innerHTML = topbarHTML + (currentView==='stats' ? statsHTML : logHTML) + navHTML;
 
   // wire events
   document.getElementById('dayPrev').onclick = ()=>{ selectedDay = addDays(selectedDay,-1); render(); };
@@ -1561,6 +1589,10 @@ function render(){
     openOverlay('overlayExport');
   };
   document.getElementById('menuLogout').onclick = ()=>{ closeOverlay('overlayTopMenu'); fbAuth.signOut(); };
+  document.getElementById('navLog').onclick = ()=>{ currentView = 'log'; render(); };
+  document.getElementById('navStats').onclick = ()=>{ currentView = 'stats'; render(); };
+
+  if(currentView !== 'log') return;
 
   document.querySelectorAll('.tl-edit').forEach(b=>{
     b.onclick = ()=> openStatusEdit(b.dataset.task);
