@@ -336,7 +336,7 @@ body{
 }
 .fs-timer.rotated .fs-inner{
   width:100vh; height:100vw;
-  transform:rotate(90deg);
+  transform:rotate(-90deg);
 }
 .fs-name{font-size:22px; font-weight:800; color:var(--ink); text-align:center; max-width:90vw;}
 .fs-clock{max-width:640px; gap:2%;}
@@ -2054,14 +2054,27 @@ function closeFullscreenTimer(){
 document.getElementById('fsClose').addEventListener('click', closeFullscreenTimer);
 document.getElementById('fsRotate').addEventListener('click', ()=>{
   const fs = document.getElementById('fsTimer');
-  const on = fs.classList.toggle('rotated');
-  document.getElementById('fsRotate').classList.toggle('active', on);
-  try{
-    if(screen.orientation && screen.orientation.lock){
-      if(on) screen.orientation.lock('landscape').catch(()=>{});
-      else screen.orientation.unlock && screen.orientation.unlock();
+  const btn = document.getElementById('fsRotate');
+  const turningOn = !btn.classList.contains('active');
+  const hasLock = !!(screen.orientation && screen.orientation.lock);
+  if(hasLock){
+    if(turningOn){
+      screen.orientation.lock('landscape').then(()=>{
+        btn.classList.add('active');
+      }).catch(()=>{
+        // real lock unavailable right now (e.g. not fullscreen) — fall back to the CSS flip
+        fs.classList.add('rotated');
+        btn.classList.add('active');
+      });
+    }else{
+      try{ screen.orientation.unlock && screen.orientation.unlock(); }catch(e){}
+      fs.classList.remove('rotated');
+      btn.classList.remove('active');
     }
-  }catch(e){}
+  }else{
+    fs.classList.toggle('rotated');
+    btn.classList.toggle('active', turningOn);
+  }
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _fsTaskId) closeFullscreenTimer(); });
 document.addEventListener('fullscreenchange', ()=>{
