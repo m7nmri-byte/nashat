@@ -1710,7 +1710,6 @@ function renderNowCard(t, isLast){
   const canAdd = isLast && activeTasks().length < MAX_PARALLEL;
   return `
     <div class="now-card" data-card="${t.id}">
-      <div class="now-eyebrow">جارٍ الآن</div>
       <div class="now-top">
         <div class="now-title">${escapeHtml(t.name)}</div>
         <button class="tl-edit" data-fullscreen="${t.id}" title="ملء الشاشة" style="inset-inline-end:34px;">
@@ -1807,7 +1806,6 @@ function updateLiveNumbers(){
 function renderEmptyNow(){
   return `
     <div class="now-card is-idle">
-      <div class="now-eyebrow">لا شيء جارٍ الآن</div>
       <div class="now-top">
         <input type="text" class="now-title-input" id="firstTaskInput" placeholder="ما الذي تفعله الآن؟" autocomplete="off">
       </div>
