@@ -1710,7 +1710,7 @@ function renderNowCard(t, isLast){
   const canAdd = isLast && activeTasks().length < MAX_PARALLEL;
   return `
     <div class="now-card" data-card="${t.id}">
-      <div class="now-eyebrow"><span class="pulse-dot"></span> جارٍ الآن</div>
+      <div class="now-eyebrow">جارٍ الآن</div>
       <div class="now-top">
         <div class="now-title">${escapeHtml(t.name)}</div>
         <button class="tl-edit" data-fullscreen="${t.id}" title="ملء الشاشة" style="inset-inline-end:34px;">
@@ -1807,7 +1807,7 @@ function updateLiveNumbers(){
 function renderEmptyNow(){
   return `
     <div class="now-card is-idle">
-      <div class="now-eyebrow"><span class="pulse-dot"></span> لا شيء جارٍ الآن</div>
+      <div class="now-eyebrow">لا شيء جارٍ الآن</div>
       <div class="now-top">
         <input type="text" class="now-title-input" id="firstTaskInput" placeholder="ما الذي تفعله الآن؟" autocomplete="off">
       </div>
@@ -2021,10 +2021,9 @@ function clearDayLog(day){
   persist();
 }
 
-// Full-screen focus view for one task's timer. Requests the real browser
-// Fullscreen API too where it's allowed (it silently no-ops inside a
-// sandboxed iframe, e.g. the claude.ai artifact preview) — either way the
-// in-page overlay itself still fills the viewport.
+// Full-screen focus view for one task's timer. This is an in-page overlay
+// only (no browser Fullscreen API) — that API triggers the browser's own
+// "swipe down to exit fullscreen" banner, which we'd rather avoid.
 let _fsTaskId = null;
 function openFullscreenTimer(taskId){
   const t = TASKS.find(x=>x.id===taskId);
@@ -2037,49 +2036,21 @@ function openFullscreenTimer(taskId){
   clock.innerHTML = flipClockHTML(new Date() - new Date(seg.start));
   document.getElementById('fsSub').textContent = 'بدأت الساعة ' + fmtTime(seg.start) + ' ' + fmtPeriod(seg.start);
   document.getElementById('fsTimer').style.display = 'flex';
-  if(document.documentElement.requestFullscreen){
-    document.documentElement.requestFullscreen().catch(()=>{});
-  }
 }
 function closeFullscreenTimer(){
   _fsTaskId = null;
   document.getElementById('fsTimer').style.display = 'none';
   document.getElementById('fsTimer').classList.remove('rotated');
   document.getElementById('fsRotate').classList.remove('active');
-  try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-  if(document.fullscreenElement && document.exitFullscreen){
-    document.exitFullscreen().catch(()=>{});
-  }
 }
 document.getElementById('fsClose').addEventListener('click', closeFullscreenTimer);
 document.getElementById('fsRotate').addEventListener('click', ()=>{
   const fs = document.getElementById('fsTimer');
   const btn = document.getElementById('fsRotate');
-  const turningOn = !btn.classList.contains('active');
-  const hasLock = !!(screen.orientation && screen.orientation.lock);
-  if(hasLock){
-    if(turningOn){
-      screen.orientation.lock('landscape').then(()=>{
-        btn.classList.add('active');
-      }).catch(()=>{
-        // real lock unavailable right now (e.g. not fullscreen) — fall back to the CSS flip
-        fs.classList.add('rotated');
-        btn.classList.add('active');
-      });
-    }else{
-      try{ screen.orientation.unlock && screen.orientation.unlock(); }catch(e){}
-      fs.classList.remove('rotated');
-      btn.classList.remove('active');
-    }
-  }else{
-    fs.classList.toggle('rotated');
-    btn.classList.toggle('active', turningOn);
-  }
+  const on = fs.classList.toggle('rotated');
+  btn.classList.toggle('active', on);
 });
 document.addEventListener('keydown', e=>{ if(e.key==='Escape' && _fsTaskId) closeFullscreenTimer(); });
-document.addEventListener('fullscreenchange', ()=>{
-  if(!document.fullscreenElement && _fsTaskId) closeFullscreenTimer();
-});
 
 document.querySelectorAll('[data-close]').forEach(b=>{
   b.addEventListener('click', ()=>{
