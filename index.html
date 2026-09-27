@@ -945,24 +945,26 @@ function taskMetric(tasks){
 function fbListen(){
   if(!fbReady || !fbDocRef) return;
   if(fbUnsub) fbUnsub();
-  let firstSnapshot = true;
-  fbUnsub = fbDocRef.onSnapshot(doc=>{
+  fbUnsub = fbDocRef.onSnapshot({includeMetadataChanges:true}, doc=>{
     if(!doc.exists){
-      fbPush(); // first login: seed the cloud with whatever is on this device
-      firstSnapshot = false;
+      fbPush(); // first login (or truly empty account): seed the cloud with whatever is on this device
       return;
     }
     const data = doc.data();
-    // Only right after (re)connecting: a write made just before a refresh can
-    // still be "in flight" and missing from this first snapshot. If it looks
-    // less complete than what's already saved on this device, trust the
-    // device and re-push it, instead of silently erasing recent work.
-    if(firstSnapshot && Array.isArray(data.tasks) && taskMetric(data.tasks) < taskMetric(TASKS)){
-      firstSnapshot = false;
+    // A snapshot confirmed by the server (not our own optimistic local echo)
+    // that looks LESS complete than what's already on this device almost
+    // always means a write from earlier hadn't reached the server yet when
+    // this snapshot was generated — e.g. the tab was closed/refreshed right
+    // after finishing a task, or reopened the next day before yesterday's
+    // last write had a chance to sync. Trust the device and re-push it
+    // instead of silently erasing recent work. Our own intentional deletes
+    // arrive first as a pending (unconfirmed) echo that already matches what
+    // we just set locally, so they're unaffected by this check.
+    const serverConfirmed = !(doc.metadata && doc.metadata.hasPendingWrites);
+    if(serverConfirmed && Array.isArray(data.tasks) && taskMetric(data.tasks) < taskMetric(TASKS)){
       fbPush();
       return;
     }
-    firstSnapshot = false;
     let changed = false;
     if(Array.isArray(data.tasks) && JSON.stringify(data.tasks) !== JSON.stringify(TASKS)){
       TASKS = data.tasks;
