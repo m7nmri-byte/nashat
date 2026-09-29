@@ -245,7 +245,7 @@ body{
 }
 .empty-now p{color:var(--muted); font-size:14px; margin:0 0 14px;}
 .name-input{
-  width:100%; background:var(--surface-2); border:1px solid var(--border); color:var(--ink);
+  width:100%; min-width:0; background:var(--surface-2); border:1px solid var(--border); color:var(--ink);
   border-radius:var(--radius); padding:12px 14px; font-family:inherit; font-size:15px; margin-bottom:10px;
 }
 .name-input:focus{outline:none; border-color:var(--amber);}
@@ -528,7 +528,7 @@ body{
   background:var(--surface); border:1px solid var(--border); border-bottom:none;
   border-radius:22px 22px 0 0; width:100%; max-width:760px; padding:26px 18px 26px;
   transform:translateY(16px); transition:transform .2s;
-  max-height:85vh; overflow-y:auto; position:relative;
+  max-height:85vh; overflow-y:auto; overflow-x:hidden; position:relative;
   box-shadow: 0 -5px 0 rgba(0,0,0,.3);
 }
 .sheet::before{
@@ -699,12 +699,10 @@ if('serviceWorker' in navigator){
     <h3>تعديل المهمة</h3>
     <p class="desc" id="statusDesc">—</p>
     <input type="text" class="name-input" id="statusNameField" placeholder="اسم المهمة">
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
-      <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
-        <input type="datetime-local" step="1" class="name-input" id="statusStartField" style="margin-bottom:0;">
-      </div>
-      <div style="flex:1;" id="statusEndWrap">
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
+      <input type="datetime-local" step="1" class="name-input" id="statusStartField" style="margin-bottom:10px;">
+      <div id="statusEndWrap">
         <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
         <input type="datetime-local" step="1" class="name-input" id="statusEndField" style="margin-bottom:0;">
       </div>
@@ -820,16 +818,14 @@ if('serviceWorker' in navigator){
       <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
       <input type="datetime-local" step="1" class="name-input" id="pastStartField">
     </div>
-    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:flex-end;">
-      <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
-        <input type="datetime-local" step="1" class="name-input" id="pastEndField" style="margin-bottom:0;">
-      </div>
-      <div style="width:34px; text-align:center; color:var(--muted-2); font-size:11px; padding-bottom:10px;">أو</div>
-      <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">المدة (دقيقة)</div>
-        <input type="number" min="1" class="name-input" id="pastDurationField" style="margin-bottom:0;">
-      </div>
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
+      <input type="datetime-local" step="1" class="name-input" id="pastEndField">
+    </div>
+    <div style="text-align:center; color:var(--muted-2); font-size:11px; margin:-4px 0 8px;">أو</div>
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">المدة (دقيقة)</div>
+      <input type="number" min="1" class="name-input" id="pastDurationField" style="margin-bottom:0;">
     </div>
     <button class="btn btn-primary btn-block" id="pastSave">إضافة كمهمة مكتملة</button>
     <button class="sheet-close" data-close>إلغاء</button>
