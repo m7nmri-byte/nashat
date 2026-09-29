@@ -691,10 +691,14 @@ if('serviceWorker' in navigator){
     <button class="btn btn-ghost btn-block" id="statusSaveName" style="margin-bottom:16px;">حفظ الاسم</button>
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <div style="flex:1;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ البداية</div>
+        <input type="date" class="name-input" id="statusStartDateField" style="margin-bottom:6px;">
         <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت البداية</div>
         <input type="time" step="1" class="name-input" id="statusStartField" style="margin-bottom:0;">
       </div>
       <div style="flex:1;" id="statusEndWrap">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ النهاية</div>
+        <input type="date" class="name-input" id="statusEndDateField" style="margin-bottom:6px;">
         <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت النهاية</div>
         <input type="time" step="1" class="name-input" id="statusEndField" style="margin-bottom:0;">
       </div>
@@ -2305,11 +2309,15 @@ function openStatusEdit(id){
   const seg = lastSegment(t);
   const startField = document.getElementById('statusStartField');
   const endField = document.getElementById('statusEndField');
+  const startDateField = document.getElementById('statusStartDateField');
+  const endDateField = document.getElementById('statusEndDateField');
   const endWrap = document.getElementById('statusEndWrap');
   startField.value = fmtTime24(seg.start);
+  startDateField.value = dayOf(seg.start);
   if(seg.end){
     endWrap.style.display = '';
     endField.value = fmtTime24(seg.end);
+    endDateField.value = dayOf(seg.end);
   }else{
     endWrap.style.display = 'none';
   }
@@ -2335,7 +2343,7 @@ function openStatusEdit(id){
   document.getElementById('statusSaveName').onclick = ()=>{ renameTask(id, nameField.value); closeOverlay('overlayStatus'); };
   nameField.onkeydown = (e)=>{ if(e.key==='Enter') document.getElementById('statusSaveName').click(); };
   document.getElementById('statusSaveTime').onclick = ()=>{
-    if(saveSegmentTime(id, startField.value, seg.end ? endField.value : null)) closeOverlay('overlayStatus');
+    if(saveSegmentTime(id, startDateField.value, startField.value, seg.end ? endDateField.value : null, seg.end ? endField.value : null)) closeOverlay('overlayStatus');
   };
   if(t.status !== 'active'){
     document.getElementById('setDone').onclick = ()=>{ setTaskStatus(id,'completed'); closeOverlay('overlayStatus'); };
@@ -2343,21 +2351,23 @@ function openStatusEdit(id){
   }
 }
 
-// Combines a HH:MM:SS time-of-day with the existing date of an ISO timestamp,
-// so editing "the start time" only changes the clock time, not the day.
-function combineDateTime(originalISO, timeStr){
-  const d = new Date(originalISO);
+// Builds an ISO timestamp from an explicit YYYY-MM-DD date and HH:MM:SS time,
+// both taken from the edit fields — so correcting the date is possible, not
+// just the time.
+function combineDateTime(dateStr, timeStr){
+  const [y,mo,da] = dateStr.split('-').map(Number);
   const parts = timeStr.split(':').map(Number);
-  d.setHours(parts[0]||0, parts[1]||0, parts[2]||0, 0);
+  const d = new Date(y, mo-1, da, parts[0]||0, parts[1]||0, parts[2]||0, 0);
   return d.toISOString();
 }
 
-function saveSegmentTime(id, startTimeStr, endTimeStr){
+function saveSegmentTime(id, startDateStr, startTimeStr, endDateStr, endTimeStr){
   const t = TASKS.find(x=>x.id===id);
   if(!t) return false;
   const seg = lastSegment(t);
-  const newStart = combineDateTime(seg.start, startTimeStr);
-  const newEnd = endTimeStr ? combineDateTime(seg.end, endTimeStr) : null;
+  if(!startDateStr || !startTimeStr){ toast('أدخل تاريخ ووقت البداية'); return false; }
+  const newStart = combineDateTime(startDateStr, startTimeStr);
+  const newEnd = (endDateStr && endTimeStr) ? combineDateTime(endDateStr, endTimeStr) : null;
   if(newEnd && new Date(newStart) >= new Date(newEnd)){
     toast('وقت البداية يجب أن يكون قبل وقت النهاية');
     return false;
@@ -2370,7 +2380,7 @@ function saveSegmentTime(id, startTimeStr, endTimeStr){
   seg.day = dayOf(newStart);
   if(newEnd) seg.end = newEnd;
   persist();
-  toast('تم تحديث الوقت');
+  toast('تم تحديث التاريخ والوقت');
   return true;
 }
 
