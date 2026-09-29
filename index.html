@@ -148,8 +148,9 @@ body{
 .now-meta .m{display:flex; flex-direction:column; gap:2px;}
 .now-meta .m .k{font-size:11px; color:var(--muted-2);}
 .now-meta .m .v{font-size:15px; font-weight:600;}
-.now-steps{margin:0 0 14px; padding-inline-start:18px; display:flex; flex-direction:column; gap:5px;}
-.now-steps li{font-size:13.5px; color:#CFCBC2;}
+.now-steps{margin:0 0 14px; padding-inline-start:0; list-style:none; display:flex; flex-direction:column; gap:4px;}
+.now-steps li{font-size:13.5px; color:#CFCBC2; display:flex; align-items:center; gap:8px; padding:4px 2px;}
+.now-steps li::before{content:"•"; color:var(--muted-2); flex-shrink:0;}
 .now-card.is-idle{border-color:var(--border); border-style:dashed;}
 .now-card.is-idle .now-eyebrow{color:var(--muted);}
 .now-card.is-idle .pulse-dot{background:var(--muted-2); animation:none;}
@@ -476,8 +477,17 @@ body{
 .tl-badge.ongoing{background:var(--amber-dim); color:var(--amber);}
 .tl-range{display:flex; align-items:center; gap:8px; margin-top:6px; font-size:12.5px; color:var(--muted);}
 .tl-dur{margin-inline-start:4px; font-weight:600; color:var(--ink);}
-.tl-steps{margin:10px 0 0; padding-inline-start:18px; display:flex; flex-direction:column; gap:4px;}
-.tl-steps li{font-size:13px; color:#B9B5AC;}
+.tl-steps{margin:10px 0 0; padding-inline-start:0; list-style:none; display:flex; flex-direction:column; gap:3px;}
+.tl-steps li{font-size:13px; color:#B9B5AC; display:flex; align-items:center; gap:8px; padding:4px 2px;}
+.tl-steps li::before{content:"•"; color:var(--muted-2); flex-shrink:0;}
+.step-text{flex:1; min-width:0;}
+.step-actions{display:flex; gap:4px; flex-shrink:0;}
+.step-btn{
+  background:none; border:none; color:var(--muted-2); cursor:pointer; padding:3px; line-height:1;
+  border-radius:5px; display:flex; align-items:center; justify-content:center;
+}
+.step-btn:hover{color:var(--ink); background:var(--surface-3);}
+.step-btn.danger:hover{color:var(--rose);}
 .tl-empty{color:var(--muted-2); font-size:13.5px; text-align:center; padding:24px 0;}
 
 /* ---------- summary ---------- */
@@ -1154,7 +1164,7 @@ function daySegments(day){
   rows.sort((a,b)=> new Date(a.seg.start) - new Date(b.seg.start));
   // attach that day's sub-steps to the last row of their task on this day
   TASKS.forEach(t=>{
-    const daySteps = t.steps.filter(s=>s.day===day);
+    const daySteps = t.steps.map((s,i)=>({s,i})).filter(x=>x.s.day===day);
     if(!daySteps.length) return;
     const rs = rows.filter(r=>r.task.id===t.id);
     if(rs.length) rs[rs.length-1].steps = daySteps;
@@ -1772,6 +1782,7 @@ function render(){
     else b.onclick = ()=> openStatusEdit(b.dataset.task);
   });
   wireMemo(app);
+  wireStepActions(app);
 
   if(act){
     app.querySelectorAll('[data-act]').forEach(b=>{
@@ -1819,7 +1830,7 @@ function renderNowCard(t, isLast){
         <span>بدأت الساعة <span class="mono">${fmtTime(seg.start)}</span><span class="period">${fmtPeriod(seg.start)}</span></span>
         ${isResumed ? `<span>· إجمالي كل الجلسات <span class="mono" data-total="${t.id}">${fmtDurLong(taskTotalMs(t))}</span></span>` : ''}
       </div>
-      ${t.steps.length ? `<ul class="now-steps">${t.steps.map(s=>`<li>${escapeHtml(s.text)}</li>`).join('')}</ul>` : ''}
+      ${t.steps.length ? `<ul class="now-steps">${t.steps.map((s,i)=>stepItemHTML(t.id,i,s.text)).join('')}</ul>` : ''}
       <div class="now-actions">
         <button class="act-btn act-step" data-act="step" data-id="${t.id}"><span class="act-ic">＋</span><span class="act-lbl">خطوة فرعية</span></button>
         <button class="act-btn act-finish" data-act="finish" data-id="${t.id}"><span class="act-ic">✓</span><span class="act-lbl">إنهاء</span></button>
@@ -1973,12 +1984,49 @@ function renderTimelineItem(row){
         <span class="tl-dur mono">${fmtDur(dur)}</span>
         ${editable ? `<button class="tl-edit tl-edit-inline" data-task="${t.id}" title="تصحيح الحالة">✎</button>` : '<span class="tl-edit-ph"></span>'}
       </div>
-      ${row.steps && row.steps.length ? `<ul class="tl-steps">${row.steps.map(s=>`<li>${escapeHtml(s.text)}</li>`).join('')}</ul>` : ''}
+      ${row.steps && row.steps.length ? `<ul class="tl-steps">${row.steps.map(({s,i})=>stepItemHTML(row.task.id,i,s.text)).join('')}</ul>` : ''}
       ${threadOut}
     </div>
   `;
 }
 
+function stepItemHTML(taskId, idx, text){
+  return `<li>
+    <span class="step-text">${escapeHtml(text)}</span>
+    <span class="step-actions">
+      <button class="step-btn" data-step-edit="${taskId}:${idx}" title="تعديل">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"></path><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"></path></svg>
+      </button>
+      <button class="step-btn danger" data-step-del="${taskId}:${idx}" title="حذف">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </span>
+  </li>`;
+}
+function editStep(taskId, idx){
+  const t = TASKS.find(x=>x.id===taskId);
+  if(!t || !t.steps[idx]) return;
+  openInput('تعديل الخطوة', '', 'نص الخطوة', (text)=>{
+    t.steps[idx].text = text.trim();
+    persist();
+  });
+  document.getElementById('inputField').value = t.steps[idx].text;
+}
+function deleteStep(taskId, idx){
+  const t = TASKS.find(x=>x.id===taskId);
+  if(!t || !t.steps[idx]) return;
+  t.steps.splice(idx, 1);
+  persist();
+  toast('تم حذف الخطوة');
+}
+function wireStepActions(root){
+  root.querySelectorAll('[data-step-edit]').forEach(b=>{
+    b.onclick = ()=>{ const [tid, idx] = b.dataset.stepEdit.split(':'); editStep(tid, Number(idx)); };
+  });
+  root.querySelectorAll('[data-step-del]').forEach(b=>{
+    b.onclick = ()=>{ const [tid, idx] = b.dataset.stepDel.split(':'); deleteStep(tid, Number(idx)); };
+  });
+}
 function escapeHtml(s){
   return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
@@ -2584,7 +2632,7 @@ function exportJsonDay(day, btn){
     if(!byTask.has(r.task.id)) byTask.set(r.task.id, {id:r.task.id, name:r.task.name, status:r.task.status, segments:[], steps:[]});
     const entry = byTask.get(r.task.id);
     entry.segments.push(r.seg);
-    if(r.steps) entry.steps.push(...r.steps);
+    if(r.steps) entry.steps.push(...r.steps.map(x=>x.s));
   });
   activeTasks().forEach(act=>{ if(lastSegment(act).day!==day) return;
     if(!byTask.has(act.id)) byTask.set(act.id, {id:act.id, name:act.name, status:'active', segments:[], steps:[]});
@@ -2597,7 +2645,7 @@ function exportCsvDay(day, btn){
   const rows = [['المهمة','الحالة','من','إلى','المدة (دقائق)','الخطوات الفرعية']];
   daySegments(day).forEach(r=>{
     const mins = Math.round((new Date(r.seg.end)-new Date(r.seg.start))/60000);
-    rows.push([r.task.name, r.status==='done'?'أُنجزت':'قوطعت', fmtTime(r.seg.start)+' '+fmtPeriod(r.seg.start), fmtTime(r.seg.end)+' '+fmtPeriod(r.seg.end), mins, (r.steps||[]).map(x=>x.text).join(' | ')]);
+    rows.push([r.task.name, r.status==='done'?'أُنجزت':'قوطعت', fmtTime(r.seg.start)+' '+fmtPeriod(r.seg.start), fmtTime(r.seg.end)+' '+fmtPeriod(r.seg.end), mins, (r.steps||[]).map(x=>x.s.text).join(' | ')]);
   });
   activeTasks().forEach(act=>{ if(lastSegment(act).day!==day) return;
     const s = lastSegment(act);
@@ -2619,7 +2667,7 @@ function exportTxtDay(day, btn){
     const link = r.idx>0 ? '  (استكمال لجلسة سابقة)' : '';
     out += `${i+1}. ${r.task.name} [${r.status==='done'?'أُنجزت':'قوطعت'}]${link}\n`;
     out += `   ${fmtTime(r.seg.start)} ${fmtPeriod(r.seg.start)} ← ${fmtTime(r.seg.end)} ${fmtPeriod(r.seg.end)}  (${fmtDur(new Date(r.seg.end)-new Date(r.seg.start))})\n`;
-    (r.steps||[]).forEach(s=> out += `   • ${s.text}\n`);
+    (r.steps||[]).forEach(x=> out += `   • ${x.s.text}\n`);
     out += '\n';
   });
   activeTasks().forEach(act=>{ if(lastSegment(act).day!==day) return;
