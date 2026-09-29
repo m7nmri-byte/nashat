@@ -182,14 +182,13 @@ body{
 
 .flip-clock{display:flex; justify-content:center; align-items:center; gap:1.6%; margin:18px 0 12px; direction:ltr; width:100%;}
 .flip-tile{
-  background:#0C1015; border:2px solid var(--border); border-radius:20%;
-  font-family:'Almarai', sans-serif; font-weight:800; color:var(--muted-2);
-  transition:border-color .4s, color .4s;
+  background:#0C1015; border:2px solid var(--border); color:var(--muted-2);
+  font-family:'Almarai', sans-serif; font-weight:800;
   flex:1 1 0; max-width:56px; aspect-ratio:1/1; display:flex; align-items:center; justify-content:center;
-  font-size:clamp(18px, 6.5vw, 38px); font-variant-numeric:tabular-nums;
+  font-size:clamp(18px, 6.5vw, 38px); font-variant-numeric:tabular-nums; border-radius:20%;
   box-shadow: 3px 3px 0 rgba(0,0,0,.5);
 }
-.flip-colon{font-size:clamp(14px, 5vw, 30px); font-weight:800; color:var(--muted-2); opacity:.7; padding:0 1px; flex-shrink:0; transition:color .4s;}
+.flip-colon{font-size:clamp(14px, 5vw, 30px); font-weight:800; color:var(--muted-2); opacity:.7; padding:0 1px; flex-shrink:0;}
 .flip-tile.lit{border-color:var(--amber); color:var(--amber);}
 .flip-colon.lit{color:var(--amber);}
 .flip-tile.tick{animation: flipTick .3s ease;}
@@ -1881,8 +1880,10 @@ function flipClockHTML(ms){
 }
 
 function updateLiveNumbers(){
-  const dt = document.getElementById('dayTotal');
-  if(dt){ const v = fmtHM(dayStats(selectedDay).totalMs); if(dt.textContent !== v) dt.textContent = v; }
+  if(selectedDay === todayStr()){
+    const dt = document.getElementById('dayTotal');
+    if(dt){ const v = fmtHM(dayStats(selectedDay).totalMs); if(dt.textContent !== v) dt.textContent = v; }
+  }
   activeTasks().forEach(t=>{
     const seg = lastSegment(t);
     const containers = document.querySelectorAll(`[data-clock="${t.id}"]`);
