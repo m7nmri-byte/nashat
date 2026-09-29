@@ -2486,15 +2486,15 @@ function openStatusEdit(id){
     wrap.innerHTML = '';
   }else{
     const current = t.status === 'completed' ? 'أُنجزت' : 'قوطعت';
-    document.getElementById('statusDesc').textContent = `مسجّلة حاليًا بحالة: ${current}. عدّل ما تحتاجه واضغط حفظ، أو صحّح الحالة أدناه.`;
+    document.getElementById('statusDesc').textContent = `الحالة الحالية: ${current}. عدّل ما تحتاجه واضغط حفظ، أو صحّح الحالة أدناه.`;
     wrap.innerHTML = `
       <button class="option-btn" id="setDone" ${t.status==='completed'?'disabled':''}>
         <span class="ic">✓</span>
-        <span class="t"><span class="h">في الحقيقة هذه المهمة اكتملت بالكامل</span><span class="s">تصحيح الحالة إلى: أُنجزت</span></span>
+        <span class="t"><span class="h">تصحيح إلى: أُنجزت</span></span>
       </button>
       <button class="option-btn" id="setInterrupted" ${t.status==='interrupted'?'disabled':''}>
         <span class="ic">⤴</span>
-        <span class="t"><span class="h">في الحقيقة هذه المهمة قوطعت ولم تكتمل</span><span class="s">تصحيح الحالة إلى: قوطعت</span></span>
+        <span class="t"><span class="h">تصحيح إلى: قوطعت</span></span>
       </button>
     `;
   }
