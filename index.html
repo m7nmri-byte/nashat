@@ -688,22 +688,17 @@ if('serviceWorker' in navigator){
     <h3>تعديل المهمة</h3>
     <p class="desc" id="statusDesc">—</p>
     <input type="text" class="name-input" id="statusNameField" placeholder="اسم المهمة">
-    <button class="btn btn-ghost btn-block" id="statusSaveName" style="margin-bottom:16px;">حفظ الاسم</button>
     <div style="display:flex; gap:8px; margin-bottom:8px;">
       <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ البداية</div>
-        <input type="date" class="name-input" id="statusStartDateField" style="margin-bottom:6px;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت البداية</div>
-        <input type="time" step="1" class="name-input" id="statusStartField" style="margin-bottom:0;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
+        <input type="datetime-local" step="1" class="name-input" id="statusStartField" style="margin-bottom:0;">
       </div>
       <div style="flex:1;" id="statusEndWrap">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ النهاية</div>
-        <input type="date" class="name-input" id="statusEndDateField" style="margin-bottom:6px;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت النهاية</div>
-        <input type="time" step="1" class="name-input" id="statusEndField" style="margin-bottom:0;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
+        <input type="datetime-local" step="1" class="name-input" id="statusEndField" style="margin-bottom:0;">
       </div>
     </div>
-    <button class="btn btn-ghost btn-block" id="statusSaveTime" style="margin-bottom:16px;">حفظ الوقت</button>
+    <button class="btn btn-primary btn-block" id="statusSaveAll" style="margin:14px 0 16px;">حفظ</button>
     <div id="statusOptions"></div>
     <button class="sheet-close" data-close>إلغاء</button>
   </div>
@@ -2368,6 +2363,10 @@ function openParallelSheet(){
   });
 }
 
+function toLocalInput(iso){
+  const d = new Date(iso);
+  return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
 function openStatusEdit(id){
   const t = TASKS.find(x=>x.id===id);
   if(!t) return;
@@ -2376,15 +2375,11 @@ function openStatusEdit(id){
   const seg = lastSegment(t);
   const startField = document.getElementById('statusStartField');
   const endField = document.getElementById('statusEndField');
-  const startDateField = document.getElementById('statusStartDateField');
-  const endDateField = document.getElementById('statusEndDateField');
   const endWrap = document.getElementById('statusEndWrap');
-  startField.value = fmtTime24(seg.start);
-  startDateField.value = dayOf(seg.start);
+  startField.value = toLocalInput(seg.start);
   if(seg.end){
     endWrap.style.display = '';
-    endField.value = fmtTime24(seg.end);
-    endDateField.value = dayOf(seg.end);
+    endField.value = toLocalInput(seg.end);
   }else{
     endWrap.style.display = 'none';
   }
@@ -2394,7 +2389,7 @@ function openStatusEdit(id){
     wrap.innerHTML = '';
   }else{
     const current = t.status === 'completed' ? 'أُنجزت' : 'قوطعت';
-    document.getElementById('statusDesc').textContent = `مسجّلة حاليًا بحالة: ${current}. تقدر تصحح الاسم أو الوقت أو الحالة، كل واحد على حدة.`;
+    document.getElementById('statusDesc').textContent = `مسجّلة حاليًا بحالة: ${current}. عدّل ما تحتاجه واضغط حفظ، أو صحّح الحالة أدناه.`;
     wrap.innerHTML = `
       <button class="option-btn" id="setDone" ${t.status==='completed'?'disabled':''}>
         <span class="ic">✓</span>
@@ -2407,11 +2402,25 @@ function openStatusEdit(id){
     `;
   }
   openOverlay('overlayStatus');
-  document.getElementById('statusSaveName').onclick = ()=>{ renameTask(id, nameField.value); closeOverlay('overlayStatus'); };
-  nameField.onkeydown = (e)=>{ if(e.key==='Enter') document.getElementById('statusSaveName').click(); };
-  document.getElementById('statusSaveTime').onclick = ()=>{
-    if(saveSegmentTime(id, startDateField.value, startField.value, seg.end ? endDateField.value : null, seg.end ? endField.value : null)) closeOverlay('overlayStatus');
+  document.getElementById('statusSaveAll').onclick = ()=>{
+    const newName = nameField.value.trim();
+    if(!newName){ toast('اكتب اسم المهمة'); return; }
+    const startParts = startField.value.split('T');
+    const endParts = seg.end ? endField.value.split('T') : [null,null];
+    if(!startParts[0] || !startParts[1]){ toast('أدخل تاريخ ووقت البداية'); return; }
+    const newStart = combineDateTime(startParts[0], startParts[1]);
+    const newEnd = (endParts[0] && endParts[1]) ? combineDateTime(endParts[0], endParts[1]) : null;
+    if(newEnd && new Date(newStart) >= new Date(newEnd)){ toast('وقت البداية يجب أن يكون قبل وقت النهاية'); return; }
+    if(!newEnd && new Date(newStart) > new Date()){ toast('لا يمكن أن يكون وقت البداية في المستقبل'); return; }
+    t.name = newName;
+    seg.start = newStart;
+    seg.day = dayOf(newStart);
+    if(newEnd) seg.end = newEnd;
+    persist();
+    toast('تم حفظ التعديلات');
+    closeOverlay('overlayStatus');
   };
+  nameField.onkeydown = (e)=>{ if(e.key==='Enter') document.getElementById('statusSaveAll').click(); };
   if(t.status !== 'active'){
     document.getElementById('setDone').onclick = ()=>{ setTaskStatus(id,'completed'); closeOverlay('overlayStatus'); };
     document.getElementById('setInterrupted').onclick = ()=>{ setTaskStatus(id,'interrupted'); closeOverlay('overlayStatus'); };
