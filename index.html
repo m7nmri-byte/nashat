@@ -686,7 +686,7 @@ if('serviceWorker' in navigator){
     <hr class="sheet-divider">
     <div class="sheet-foot">
       <button class="sheet-close" data-close>إلغاء</button>
-      <button class="btn-endday" id="nextStopDay"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg><span id="nextStopLbl">إنهاء اليوم</span></button>
+      <button class="btn-endday" id="nextStopDay"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg><span id="nextStopLbl">توقفت عن التسجيل</span></button>
     </div>
   </div>
 </div>
@@ -2318,7 +2318,7 @@ function openNextSheet(closeStatus, title){
   document.getElementById('nextNameField').value = '';
   nextBackCtrl.reset();
   const others = otherActive();
-  document.getElementById('nextStopLbl').textContent = others.length ? `بدون جديد — أكمل على «${others[0].name}»` : 'إنهاء اليوم';
+  document.getElementById('nextStopLbl').textContent = others.length ? `بدون جديد — أكمل على «${others[0].name}»` : 'توقفت عن التسجيل';
   switchNextMode('new');
   openOverlay('overlayNext');
   setTimeout(()=>document.getElementById('nextNameField').focus(), 150);
@@ -2369,7 +2369,7 @@ function stopForToday(closeStatus){
   const stillRunning = activeTasks().length > 0;
   persist();
   if(stillRunning) toast(closeStatus==='completed' ? 'سُجّلت كمُنجزة — والأخرى مستمرة' : 'سُجّلت كمقاطَعة — والأخرى مستمرة');
-  else toast(closeStatus==='completed' ? 'تم إنهاء اليوم — آخر مهمة سُجّلت كمُنجزة' : 'تم إنهاء اليوم — آخر مهمة سُجّلت كمقاطَعة');
+  else toast(closeStatus==='completed' ? 'تم التوقف عن التسجيل — آخر مهمة سُجّلت كمُنجزة' : 'تم التوقف عن التسجيل — آخر مهمة سُجّلت كمقاطَعة');
 }
 
 // Only reachable when there's no current active task (start of day / empty-now)
