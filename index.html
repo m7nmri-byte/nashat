@@ -317,6 +317,17 @@ body{
 .section-head .count{font-size:12px; color:var(--muted-2);}
 
 .timeline{display:flex; flex-direction:column; gap:0; align-self:start; min-width:0; margin-top:22px;}
+.tl-insert{
+  display:flex; align-items:center; gap:6px; width:100%; background:none; border:none; padding:5px 0;
+  cursor:pointer; opacity:0; transition:opacity .15s; height:18px;
+}
+.tl-insert:hover, .tl-insert:focus-visible{opacity:1;}
+.tl-insert-line{flex:1; height:1px; background:var(--border);}
+.tl-insert-dot{
+  flex-shrink:0; width:18px; height:18px; border-radius:50%; background:var(--surface-3); color:var(--muted);
+  font-size:13px; line-height:16px; border:1px solid var(--border);
+}
+@media (hover:none){ .tl-insert{opacity:.45;} }
 /* ---------- charts ---------- */
 .charts{display:flex; flex-direction:column; gap:18px; min-width:0; margin-top:4px;}
 
@@ -757,15 +768,6 @@ if('serviceWorker' in navigator){
       </span>
       <span class="t"><span class="h">تصدير</span></span>
     </button>
-    <button class="option-btn" id="menuAddPast">
-      <span class="ic">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="9"></circle>
-          <path d="M9 12l2 2 4-4"></path>
-        </svg>
-      </span>
-      <span class="t"><span class="h">إضافة مهمة منجزة سابقًا</span><span class="s">تحدّد البداية والنهاية مباشرة</span></span>
-    </button>
     <button class="option-btn" id="menuClearDay" style="color:var(--rose);">
       <span class="ic" style="color:var(--rose);">
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -811,21 +813,22 @@ if('serviceWorker' in navigator){
 
 <div class="overlay" id="overlayAddPast">
   <div class="sheet">
-    <h3>إضافة مهمة منجزة سابقًا</h3>
+    <h3 id="pastTitle">إضافة مهمة</h3>
     <p class="desc">تُسجَّل مباشرة كمهمة مكتملة، بدون المرور بمؤقّت حي.</p>
     <input type="text" class="name-input" id="pastNameField" placeholder="اسم المهمة">
-    <div style="display:flex; gap:8px; margin-bottom:8px;">
+    <div style="margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
+      <input type="datetime-local" step="1" class="name-input" id="pastStartField">
+    </div>
+    <div style="display:flex; gap:8px; margin-bottom:8px; align-items:flex-end;">
       <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ البداية</div>
-        <input type="date" class="name-input" id="pastStartDateField" style="margin-bottom:6px;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت البداية</div>
-        <input type="time" step="1" class="name-input" id="pastStartField" style="margin-bottom:0;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
+        <input type="datetime-local" step="1" class="name-input" id="pastEndField" style="margin-bottom:0;">
       </div>
+      <div style="width:34px; text-align:center; color:var(--muted-2); font-size:11px; padding-bottom:10px;">أو</div>
       <div style="flex:1;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">تاريخ النهاية</div>
-        <input type="date" class="name-input" id="pastEndDateField" style="margin-bottom:6px;">
-        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">وقت النهاية</div>
-        <input type="time" step="1" class="name-input" id="pastEndField" style="margin-bottom:0;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">المدة (دقيقة)</div>
+        <input type="number" min="1" class="name-input" id="pastDurationField" style="margin-bottom:0;">
       </div>
     </div>
     <button class="btn btn-primary btn-block" id="pastSave">إضافة كمهمة مكتملة</button>
@@ -1715,7 +1718,7 @@ function render(){
     </div>
 
     <div class="timeline" id="timeline">
-      ${rows.length ? rows.map(r=>renderTimelineItem(r)).join('') : '<div class="tl-empty">لا توجد مهام مسجّلة في هذا اليوم</div>'}
+      ${rows.length ? buildTimelineHTML(rows) : `<div class="tl-empty">لا توجد مهام مسجّلة في هذا اليوم</div>${insertRowHTML(null,null)}`}
     </div>
   `;
 
@@ -1752,18 +1755,6 @@ function render(){
     openOverlay('overlayExport');
   };
   document.getElementById('menuLogout').onclick = ()=>{ closeOverlay('overlayTopMenu'); fbAuth.signOut(); };
-  document.getElementById('menuAddPast').onclick = ()=>{
-    closeOverlay('overlayTopMenu');
-    document.getElementById('pastNameField').value = '';
-    const nowStr = fmtTime24(nowISO());
-    const todayD = todayStr();
-    document.getElementById('pastStartDateField').value = todayD;
-    document.getElementById('pastEndDateField').value = todayD;
-    document.getElementById('pastStartField').value = nowStr;
-    document.getElementById('pastEndField').value = nowStr;
-    openOverlay('overlayAddPast');
-    setTimeout(()=>document.getElementById('pastNameField').focus(), 150);
-  };
   document.getElementById('menuClearDay').onclick = ()=>{
     closeOverlay('overlayTopMenu');
     openConfirm('مسح سجل هذا اليوم؟', `سيُحذف نهائيًا كل ما سُجّل في ${arDate(selectedDay)}، بما في ذلك أي مهمة جارية الآن ضمن هذا اليوم. لا يمكن التراجع عن هذا.`, ()=> clearDayLog(selectedDay));
@@ -1777,6 +1768,9 @@ function render(){
 
   if(currentView !== 'log') return;
 
+  document.querySelectorAll('.tl-insert').forEach(b=>{
+    b.onclick = ()=> openAddPast(b.dataset.prev || null, b.dataset.next || null);
+  });
   document.querySelectorAll('.tl-edit').forEach(b=>{
     if(b.dataset.fullscreen) b.onclick = ()=> openFullscreenTimer(b.dataset.fullscreen);
     else b.onclick = ()=> openStatusEdit(b.dataset.task);
@@ -1934,6 +1928,22 @@ function statusGlyph(status, size){
   return `<svg class="glyph g-ring" width="${z}" height="${z}" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6.75" fill="none" stroke-width="1.5"/></svg>`;
 }
 
+function insertRowHTML(prevEndISO, nextStartISO){
+  return `<button class="tl-insert" data-prev="${prevEndISO||''}" data-next="${nextStartISO||''}" title="إضافة مهمة هنا">
+    <span class="tl-insert-line"></span><span class="tl-insert-dot">+</span><span class="tl-insert-line"></span>
+  </button>`;
+}
+// rows are newest-first; between two adjacent rows, the OLDER one's end feeds
+// the new task's start and the NEWER one's start feeds the new task's end.
+function buildTimelineHTML(rows){
+  let html = insertRowHTML(rows[0].seg.end, null);
+  rows.forEach((r,i)=>{
+    html += renderTimelineItem(r);
+    const older = rows[i+1];
+    html += insertRowHTML(older ? older.seg.end : null, r.seg.start);
+  });
+  return html;
+}
 function renderTimelineItem(row){
   const t = row.task, seg = row.seg, status = row.status;
   const badgeText = status==='done' ? 'أُنجزت' : 'قوطعت';
@@ -2106,16 +2116,58 @@ document.getElementById('confirmYes').addEventListener('click', ()=>{
   if(action) action();
 });
 
+let _pastSyncing = false;
+function pastRecalcDuration(){
+  if(_pastSyncing) return;
+  const s = document.getElementById('pastStartField').value;
+  const e = document.getElementById('pastEndField').value;
+  if(!s || !e) return;
+  const ms = new Date(e) - new Date(s);
+  _pastSyncing = true;
+  document.getElementById('pastDurationField').value = ms > 0 ? Math.round(ms/60000) : '';
+  _pastSyncing = false;
+}
+function pastRecalcEnd(){
+  if(_pastSyncing) return;
+  const s = document.getElementById('pastStartField').value;
+  const mins = parseInt(document.getElementById('pastDurationField').value, 10);
+  if(!s || !mins) return;
+  const end = new Date(s);
+  end.setMinutes(end.getMinutes() + mins);
+  _pastSyncing = true;
+  document.getElementById('pastEndField').value = toLocalInput(end.toISOString());
+  _pastSyncing = false;
+}
+document.getElementById('pastStartField').addEventListener('input', pastRecalcDuration);
+document.getElementById('pastEndField').addEventListener('input', pastRecalcDuration);
+document.getElementById('pastDurationField').addEventListener('input', pastRecalcEnd);
+
+// Opens the add-task sheet from a timeline insertion point. prevEndISO (the
+// end of the session right before this gap) pre-fills the start; nextStartISO
+// (the start of the session right after this gap) pre-fills the end — so a
+// task inserted between two others connects to both with no gap or overlap.
+function openAddPast(prevEndISO, nextStartISO){
+  document.getElementById('pastTitle').textContent =
+    prevEndISO && nextStartISO ? 'إضافة مهمة بين جلستين' :
+    prevEndISO ? 'إضافة مهمة بعد هذه الجلسة' :
+    nextStartISO ? 'إضافة مهمة قبل هذه الجلسة' : 'إضافة مهمة';
+  document.getElementById('pastNameField').value = '';
+  document.getElementById('pastStartField').value = prevEndISO ? toLocalInput(prevEndISO) : '';
+  document.getElementById('pastEndField').value = nextStartISO ? toLocalInput(nextStartISO) : '';
+  document.getElementById('pastDurationField').value = '';
+  pastRecalcDuration();
+  openOverlay('overlayAddPast');
+  setTimeout(()=>document.getElementById('pastNameField').focus(), 150);
+}
+
 document.getElementById('pastSave').addEventListener('click', ()=>{
   const name = document.getElementById('pastNameField').value.trim();
-  const sd = document.getElementById('pastStartDateField').value;
-  const st = document.getElementById('pastStartField').value;
-  const ed = document.getElementById('pastEndDateField').value;
-  const et = document.getElementById('pastEndField').value;
+  const sVal = document.getElementById('pastStartField').value;
+  const eVal = document.getElementById('pastEndField').value;
   if(!name){ toast('اكتب اسم المهمة'); return; }
-  if(!sd || !st || !ed || !et){ toast('أدخل تاريخ ووقت البداية والنهاية'); return; }
-  const start = combineDateTime(sd, st);
-  const end = combineDateTime(ed, et);
+  if(!sVal || !eVal){ toast('أدخل وقت البداية والنهاية (أو المدة)'); return; }
+  const start = new Date(sVal).toISOString();
+  const end = new Date(eVal).toISOString();
   if(new Date(start) >= new Date(end)){ toast('وقت البداية يجب أن يكون قبل وقت النهاية'); return; }
   if(new Date(end) > new Date()){ toast('لا يمكن أن يكون وقت النهاية في المستقبل'); return; }
   TASKS.push({
