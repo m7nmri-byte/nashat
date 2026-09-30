@@ -337,6 +337,15 @@ body{
   padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   box-shadow:0 -3px 0 rgba(0,0,0,.35);
 }
+.period-tabs{display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;}
+.period-tab{
+  flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  border-radius:999px; padding:8px 6px; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  box-shadow:2px 2px 0 rgba(0,0,0,.3); transition:transform .08s, box-shadow .08s;
+  white-space:nowrap;
+}
+.period-tab.active{background:var(--amber); color:#07211D; border-color:var(--amber);}
+.period-tab:active{transform:translate(2px,2px); box-shadow:0 0 0 rgba(0,0,0,0);}
 .bn-tab{
   flex:1; display:flex; flex-direction:column; align-items:center; gap:3px;
   background:none; border:none; color:var(--muted-2); font-family:inherit; font-size:11px; font-weight:700;
@@ -403,6 +412,11 @@ body{
 .ch-hrow .v{text-align:start; color:var(--ink);}
 .ch-take{font-size:13px; color:var(--ink); line-height:1.85; margin:0 0 16px; opacity:.9;}
 .ch-stats{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px;}
+.ch-toptasks{display:flex; flex-direction:column; gap:2px;}
+.ch-toprow{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 2px; font-size:13px; color:var(--ink); border-bottom:1px solid var(--border);}
+.ch-toprow:last-child{border-bottom:none;}
+.ch-toprow span{overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.ch-toprow b{color:var(--amber); flex-shrink:0; font-size:13px;}
 .ch-stat{flex:1; min-width:78px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:9px 6px; text-align:center;}
 .ch-stat .n{font-size:15px; font-weight:800; color:var(--ink);}
 .ch-stat .l{font-size:10px; color:var(--muted-2); margin-top:2px;}
@@ -1027,6 +1041,7 @@ function fbListen(){
 let TASKS = loadTasks();
 let selectedDay = todayStr();
 let currentView = 'log'; // 'log' | 'stats'
+let currentPeriod = 'day'; // 'day' | 'week' | 'month' | 'year' | 'all'
 
 function persist(){
   saveTasks(TASKS);
@@ -1573,28 +1588,30 @@ function chartClosure(day){
     <div class="ch-legend"><span><i style="background:var(--green)"></i>أُنجزت (فوق)</span><span><i style="background:var(--rose)"></i>قوطعت (تحت)</span></div>`;
 }
 
-/* 5) Heatmap of focus hours */
-function chartPeakHours(day){
-  const days = []; for(let i=6;i>=0;i--) days.push(addDays(day,-i));
-  const rows = days.map(d=>{
-    const [d0] = dayBounds(d);
+/* 5) Heatmap of focus hours — aggregates every day in `days` by weekday,
+   so the same chart works whether it's given 1 day, 7, or a whole year */
+function chartPeakHours(days, highlightWd){
+  const byWd = {};
+  days.forEach(d=>{
     const segs = chartSegs(d).filter(s=> segMin(s) >= 15);
-    const hrs = new Array(24).fill(0);
+    if(!segs.length) return;
+    const [d0] = dayBounds(d);
+    const wd = AR_WD[new Date(d+'T12:00:00').getDay()];
+    if(!byWd[wd]) byWd[wd] = new Array(24).fill(0);
     unionIntervals(segs).forEach(([a,b])=>{
       for(let h=0; h<24; h++){
         const x=d0+h*3600000, y=x+3600000;
-        hrs[h] += Math.max(0, Math.min(b,y)-Math.max(a,x))/60000;
+        byWd[wd][h] += Math.max(0, Math.min(b,y)-Math.max(a,x))/60000;
       }
     });
-    return {d, hrs, wd:AR_WD[new Date(d+'T12:00:00').getDay()]};
   });
   const WEEK_ORDER = ['سبت','أحد','إثنين','ثلاثاء','أربعاء','خميس','جمعة'];
-  rows.sort((a,b)=> WEEK_ORDER.indexOf(a.wd) - WEEK_ORDER.indexOf(b.wd));
+  const rows = WEEK_ORDER.filter(wd=>byWd[wd]).map(wd=>({wd, hrs:byWd[wd]}));
   const colSum = new Array(24).fill(0);
   rows.forEach(r=> r.hrs.forEach((m,h)=> colSum[h]+=m));
   const used = colSum.map((m,h)=>m>0?h:-1).filter(h=>h>=0);
   if(!used.length) return chartEmpty('لا توجد جلسات تركيز (١٥د فأكثر) بعد');
-  const focusDays = rows.filter(r=>r.hrs.some(m=>m>0)).length;
+  const focusDays = rows.length;
   const totalFocus = colSum.reduce((a,x)=>a+x,0);
 
   // best 2-hour window vs the average active window
@@ -1615,7 +1632,7 @@ function chartPeakHours(day){
   }else if(used.length <= 2){
     msg = `تركيزك محصور ${range} تقريبًا`;
   }else if(bestV < avgWin*1.3){
-    msg = `تركيزك موزّع على اليوم بدون ذروة واضحة — أفضل وقت بفارق بسيط ${range}`;
+    msg = `تركيزك موزّع بدون ذروة واضحة — أفضل وقت بفارق بسيط ${range}`;
   }else{
     msg = `ذروة تركيزك غالبًا ${range}` + (focusDays >= 3 ? ' — احجز هذا الوقت للمهام الثقيلة وأجّل المتابعات لغيره' : ' — راقبها مع الأيام لتتأكد');
   }
@@ -1626,7 +1643,7 @@ function chartPeakHours(day){
   const n = h1-h0, cw = (W-lblW)/n, ch = 16, H = top + rows.length*(ch+cellGap) + 16;
   let g = '';
   rows.forEach((r,ri)=>{
-    const y = top + ri*(ch+cellGap), isSel = r.d===day;
+    const y = top + ri*(ch+cellGap), isSel = highlightWd && r.wd===highlightWd;
     g += `<text x="${W-lblW/2}" y="${y+ch/2+3.5}" text-anchor="middle" class="ch-axis${isSel?' sel':''}">${r.wd}</text>`;
     for(let h=h0; h<h1; h++){
       const m = r.hrs[h], x = W - lblW - (h-h0+1)*cw;
@@ -1644,6 +1661,92 @@ function chartPeakHours(day){
     <div class="ch-note">كلما اشتدّ اللون زادت دقائق التركيز في تلك الساعة</div>`;
 }
 
+// ---- date ranges + aggregate view for week/month/year/all ----
+function periodDays(period, endDay){
+  if(period==='week'){ const a=[]; for(let i=6;i>=0;i--) a.push(addDays(endDay,-i)); return a; }
+  if(period==='month'){ const a=[]; for(let i=29;i>=0;i--) a.push(addDays(endDay,-i)); return a; }
+  if(period==='year'){ const a=[]; for(let i=364;i>=0;i--) a.push(addDays(endDay,-i)); return a; }
+  if(period==='all'){ const a = allDays().filter(d=>d<=endDay); return a.length ? a : [endDay]; }
+  return [endDay];
+}
+const PERIOD_LABEL = {week:'آخر 7 أيام', month:'آخر 30 يومًا', year:'آخر سنة', all:'كل الوقت'};
+
+function chartsRangeHTML(days, period){
+  const daySet = new Set(days);
+  let totalMs = 0, completed = 0, interrupted = 0;
+  const perDay = {}; days.forEach(d=> perDay[d] = 0);
+  const byTask = new Map();
+  TASKS.forEach(t=>{
+    t.segments.forEach((seg, idx)=>{
+      if(!daySet.has(seg.day)) return;
+      const end = seg.end ? new Date(seg.end) : new Date();
+      const ms = end - new Date(seg.start);
+      totalMs += ms;
+      perDay[seg.day] = (perDay[seg.day]||0) + ms;
+      byTask.set(t.id, (byTask.get(t.id)||0) + ms);
+      const status = segmentStatus(t, idx);
+      if(status==='done') completed++;
+      if(status==='interrupted') interrupted++;
+    });
+  });
+  const activeDays = Object.values(perDay).filter(v=>v>0).length;
+  const avgMs = activeDays ? totalMs/activeDays : 0;
+
+  if(totalMs===0){
+    return `<section class="ch-block"><h3>${PERIOD_LABEL[period]}</h3>${chartEmpty('لا توجد بيانات في هذه الفترة بعد')}</section>`;
+  }
+
+  const summary = `
+    <section class="ch-block"><h3>ملخّص — ${PERIOD_LABEL[period]}</h3>
+      ${statRow([
+        {n: fmtHM(totalMs), l:'إجمالي الوقت'},
+        {n: completed, l:'أُنجزت'},
+        {n: interrupted, l:'مقاطعات'},
+        {n: fmtHM(avgMs), l:'متوسط اليوم'}
+      ])}
+    </section>`;
+
+  // daily bar chart — bucket into weeks if the range is long, so bars stay readable
+  const bucketSize = days.length > 45 ? 7 : 1;
+  const buckets = [];
+  for(let i=0; i<days.length; i+=bucketSize){
+    const slice = days.slice(i, i+bucketSize);
+    const ms = slice.reduce((a,d)=>a+(perDay[d]||0), 0);
+    buckets.push({label: bucketSize>1 ? '' : new Date(slice[0]+'T12:00:00').toLocaleDateString('ar-SA-u-ca-gregory',{day:'numeric',month:'numeric'}), ms});
+  }
+  const W=340, H=130, padX=8, padB=18, padT=6;
+  const bw = Math.max(2, (W-padX*2)/buckets.length - 2);
+  const maxMs = Math.max(...buckets.map(b=>b.ms), 1);
+  let bars = '';
+  buckets.forEach((b,i)=>{
+    const h = Math.max(b.ms>0?3:0, (b.ms/maxMs)*(H-padT-padB));
+    const x = padX + i*((W-padX*2)/buckets.length);
+    bars += `<rect x="${x}" y="${H-padB-h}" width="${bw}" height="${h}" rx="2" fill="var(--amber)" fill-opacity="${b.ms>0?.85:0}"><title>${b.label||''} ${fmtHM(b.ms)}</title></rect>`;
+  });
+  if(bucketSize===1 && buckets.length<=14){
+    buckets.forEach((b,i)=>{
+      const x = padX + i*((W-padX*2)/buckets.length) + bw/2;
+      bars += `<text x="${x}" y="${H-4}" text-anchor="middle" class="ch-axis">${b.label}</text>`;
+    });
+  }
+  const dailyChart = `
+    <section class="ch-block"><h3>الوقت اليومي${bucketSize>1?' (مجمّع أسبوعيًا)':''}</h3>
+      <svg ${svgNS} viewBox="0 0 ${W} ${H}" class="ch-svg" style="overflow:hidden">${bars}</svg>
+    </section>`;
+
+  const peakSection = `<section class="ch-block"><h3>متى تركّز أفضل؟</h3>${chartPeakHours(days)}</section>`;
+
+  const top5 = Array.from(byTask.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5)
+    .map(([id,ms])=>{ const t=TASKS.find(x=>x.id===id); return t ? {n:fmtHM(ms), l:escapeHtml(t.name)} : null; })
+    .filter(Boolean);
+  const topTasks = top5.length ? `
+    <section class="ch-block"><h3>الأكثر استهلاكًا للوقت</h3>
+      <div class="ch-toptasks">${top5.map(x=>`<div class="ch-toprow"><span>${x.l}</span><b class="mono">${x.n}</b></div>`).join('')}</div>
+    </section>` : '';
+
+  return summary + dailyChart + peakSection + topTasks;
+}
+
 function chartsHTML(day){
   const segs = chartSegs(day);
   return `
@@ -1651,7 +1754,7 @@ function chartsHTML(day){
     <section class="ch-block"><h3>تركيز أم تشتّت؟</h3>${chartFocusMix(day, segs)}</section>
     <section class="ch-block"><h3>الحلقات المفتوحة</h3>${chartOpenLoops()}</section>
     <section class="ch-block"><h3>أغلقت أم تركت؟ — آخر ٧ أيام</h3>${chartClosure(day)}</section>
-    <section class="ch-block"><h3>متى تركّز أفضل؟</h3>${chartPeakHours(day)}</section>
+    <section class="ch-block"><h3>متى تركّز أفضل؟</h3>${chartPeakHours(periodDays('week', day), AR_WD[new Date(day+'T12:00:00').getDay()])}</section>
   `;
 }
 
@@ -1662,7 +1765,8 @@ document.addEventListener('click', e=>{
 
 function refreshCharts(){
   const el = document.getElementById('charts');
-  if(el) el.innerHTML = chartsHTML(selectedDay);
+  if(!el) return;
+  el.innerHTML = currentPeriod==='day' ? chartsHTML(selectedDay) : chartsRangeHTML(periodDays(currentPeriod, selectedDay), currentPeriod);
 }
 setInterval(()=>{ if(activeTasks().length) refreshCharts(); }, 30000);
 
@@ -1727,7 +1831,15 @@ function render(){
     </div>
   `;
 
-  const statsHTML = `<div class="charts" id="charts">${chartsHTML(selectedDay)}</div>`;
+  const periodTabs = `
+    <div class="period-tabs">
+      ${[['day','يوم'],['week','أسبوع'],['month','شهر'],['year','سنة'],['all','الكل']].map(([k,l])=>
+        `<button class="period-tab ${currentPeriod===k?'active':''}" data-period="${k}">${l}</button>`
+      ).join('')}
+    </div>`;
+  const statsHTML = `${periodTabs}<div class="charts" id="charts">${
+    currentPeriod==='day' ? chartsHTML(selectedDay) : chartsRangeHTML(periodDays(currentPeriod, selectedDay), currentPeriod)
+  }</div>`;
 
   const navHTML = `
     <div class="bottom-nav">
@@ -1770,6 +1882,9 @@ function render(){
   };
   document.getElementById('navLog').onclick = ()=>{ currentView = 'log'; render(); };
   document.getElementById('navStats').onclick = ()=>{ currentView = 'stats'; render(); };
+  document.querySelectorAll('.period-tab').forEach(b=>{
+    b.onclick = ()=>{ currentPeriod = b.dataset.period; render(); };
+  });
 
   if(currentView !== 'log') return;
 
@@ -2198,7 +2313,12 @@ function openAddPast(prevEndISO, nextStartISO){
     nextStartISO ? 'إضافة مهمة قبل هذه الجلسة' : 'إضافة مهمة';
   document.getElementById('pastNameField').value = '';
   document.getElementById('pastStartField').value = prevEndISO ? toLocalInput(prevEndISO) : '';
-  document.getElementById('pastEndField').value = nextStartISO ? toLocalInput(nextStartISO) : '';
+  let endDefault = nextStartISO;
+  if(!endDefault){
+    const act = activeTasks()[0];
+    endDefault = act ? lastSegment(act).start : nowISO();
+  }
+  document.getElementById('pastEndField').value = toLocalInput(endDefault);
   document.getElementById('pastDurationField').value = '';
   pastRecalcDuration();
   openOverlay('overlayAddPast');
