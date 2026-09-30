@@ -337,6 +337,14 @@ body{
   padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   box-shadow:0 -3px 0 rgba(0,0,0,.35);
 }
+.cat-picker{display:flex; gap:6px; margin-bottom:10px;}
+.cat-pill{
+  flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
+  border-radius:999px; padding:9px 6px; font-family:inherit; font-size:12.5px; font-weight:700; cursor:pointer;
+  transition:transform .08s;
+}
+.cat-pill.active{background:var(--amber); color:#07211D; border-color:var(--amber);}
+.cat-pill:active{transform:scale(.96);}
 .period-tabs{display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;}
 .period-tab{
   flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
@@ -688,6 +696,11 @@ if('serviceWorker' in navigator){
     </div>
     <div id="nextBodyNew">
       <input type="text" class="name-input" id="nextNameField" placeholder="اسم المهمة الجديدة">
+      <div class="cat-picker" id="nextTaskCat">
+        <button type="button" class="cat-pill active" data-cat="work">عمل</button>
+        <button type="button" class="cat-pill" data-cat="rest">راحة</button>
+        <button type="button" class="cat-pill" data-cat="waste">هدر</button>
+      </div>
       <div class="start-row">
         <label class="back-time" for="nextBackInput"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg>منذ <input type="text" class="back-time-input" id="nextBackInput" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0"> دقيقة</label>
         <button class="btn btn-primary" id="nextConfirmNew">تأكيد</button>
@@ -837,6 +850,11 @@ if('serviceWorker' in navigator){
     <h3 id="pastTitle">إضافة مهمة</h3>
     <p class="desc">تُسجَّل مباشرة كمهمة مكتملة، بدون المرور بمؤقّت حي.</p>
     <input type="text" class="name-input" id="pastNameField" placeholder="اسم المهمة">
+    <div class="cat-picker" id="pastCat">
+      <button type="button" class="cat-pill active" data-cat="work">عمل</button>
+      <button type="button" class="cat-pill" data-cat="rest">راحة</button>
+      <button type="button" class="cat-pill" data-cat="waste">هدر</button>
+    </div>
     <div style="margin-bottom:8px;">
       <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">البداية</div>
       <input type="datetime-local" step="1" class="name-input" id="pastStartField">
@@ -1217,26 +1235,26 @@ function dayStats(day){
 }
 
 /* ===================== actions ===================== */
-function pushNewActiveTask(name, startIso){
+function pushNewActiveTask(name, startIso, category){
   const start = startIso || nowISO();
   TASKS.push({
-    id: uid(), name: name.trim(), status:'active',
+    id: uid(), name: name.trim(), status:'active', category: category || 'work',
     segments:[{start, end:null, day: dayOf(start)}],
     steps:[]
   });
 }
 
-function startFirstTask(name, backMinutes){
+function startFirstTask(name, backMinutes, category){
   const backMs = Math.max(0, (backMinutes||0)) * 60000;
   const start = new Date(Date.now() - backMs).toISOString();
-  pushNewActiveTask(name, start);
+  pushNewActiveTask(name, start, category);
   persist();
   toast(backMinutes>0 ? `بدأت تسجيل: ${name.trim()} (منذ ${backMinutes} دقيقة)` : 'بدأت تسجيل: ' + name.trim());
 }
 
-function startParallelNew(name){
+function startParallelNew(name, category){
   if(activeTasks().length >= MAX_PARALLEL) return;
-  pushNewActiveTask(name, nowISO());
+  pushNewActiveTask(name, nowISO(), category);
   persist();
   toast('بدأت بالتوازي: ' + name.trim());
 }
@@ -1280,7 +1298,7 @@ function closeCurrentAndProceed(closeStatus, next){
     cur.status = closeStatus;
   }
   if(next.type === 'new'){
-    pushNewActiveTask(next.name, boundary);
+    pushNewActiveTask(next.name, boundary, next.category);
   }else{
     const t = TASKS.find(x=>x.id===next.id);
     if(t){
@@ -1915,8 +1933,9 @@ function render(){
   } else if(isToday){
     const inp = document.getElementById('firstTaskInput');
     const btn = document.getElementById('firstTaskBtn');
+    const catCtrl = wireCatPicker('firstTask');
     let backCtrl;
-    const go = ()=>{ if(inp.value.trim()){ startFirstTask(inp.value, backCtrl.get()); } else inp.focus(); };
+    const go = ()=>{ if(inp.value.trim()){ startFirstTask(inp.value, backCtrl.get(), catCtrl.get()); } else inp.focus(); };
     backCtrl = wireBackTimeControl('firstTaskBack', go);
     btn.onclick = go;
     inp.onkeydown = (e)=>{ if(e.key==='Enter') go(); };
@@ -2033,6 +2052,7 @@ function renderEmptyNow(){
         <input type="text" class="now-title-input" id="firstTaskInput" placeholder="ما الذي تفعله الآن؟" autocomplete="off">
       </div>
       <div class="flip-clock">${flipClockHTML(0)}</div>
+      ${categoryPickerHTML('firstTask')}
       <div class="start-row">
         ${backTimeControlHTML('firstTaskBack')}
         <button class="btn btn-primary" id="firstTaskBtn">بدء التسجيل</button>
@@ -2148,6 +2168,31 @@ function escapeHtml(s){
 }
 
 /* ---- reusable "how long have you actually been on this?" control ---- */
+const CAT_LABELS = {work:'عمل', rest:'راحة', waste:'هدر'};
+function categoryPickerHTML(prefix){
+  return `
+    <div class="cat-picker" id="${prefix}Cat">
+      <button type="button" class="cat-pill active" data-cat="work">عمل</button>
+      <button type="button" class="cat-pill" data-cat="rest">راحة</button>
+      <button type="button" class="cat-pill" data-cat="waste">هدر</button>
+    </div>
+  `;
+}
+function wireCatPicker(prefix){
+  const wrap = document.getElementById(prefix+'Cat');
+  if(!wrap) return { get:()=>'work', reset:()=>{} };
+  let val = 'work';
+  wrap.querySelectorAll('.cat-pill').forEach(b=>{
+    b.onclick = ()=>{
+      val = b.dataset.cat;
+      wrap.querySelectorAll('.cat-pill').forEach(x=> x.classList.toggle('active', x===b));
+    };
+  });
+  return {
+    get: ()=> val,
+    reset: ()=>{ val='work'; wrap.querySelectorAll('.cat-pill').forEach(x=> x.classList.toggle('active', x.dataset.cat==='work')); }
+  };
+}
 function backTimeControlHTML(prefix){
   return `
     <label class="back-time" for="${prefix}Input"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"></circle><polyline points="12 7 12 12 15.5 14"></polyline></svg>منذ <input type="text" class="back-time-input" id="${prefix}Input" inputmode="numeric" autocomplete="off" maxlength="4" placeholder="0"> دقيقة</label>
@@ -2306,12 +2351,14 @@ document.getElementById('pastDurationField').addEventListener('input', pastRecal
 // end of the session right before this gap) pre-fills the start; nextStartISO
 // (the start of the session right after this gap) pre-fills the end — so a
 // task inserted between two others connects to both with no gap or overlap.
+const pastCatCtrl = wireCatPicker('past');
 function openAddPast(prevEndISO, nextStartISO){
   document.getElementById('pastTitle').textContent =
     prevEndISO && nextStartISO ? 'إضافة مهمة بين جلستين' :
     prevEndISO ? 'إضافة مهمة بعد هذه الجلسة' :
     nextStartISO ? 'إضافة مهمة قبل هذه الجلسة' : 'إضافة مهمة';
   document.getElementById('pastNameField').value = '';
+  pastCatCtrl.reset();
   document.getElementById('pastStartField').value = prevEndISO ? toLocalInput(prevEndISO) : '';
   let endDefault = nextStartISO;
   if(!endDefault){
@@ -2336,7 +2383,7 @@ document.getElementById('pastSave').addEventListener('click', ()=>{
   if(new Date(start) >= new Date(end)){ toast('وقت البداية يجب أن يكون قبل وقت النهاية'); return; }
   if(new Date(end) > new Date()){ toast('لا يمكن أن يكون وقت النهاية في المستقبل'); return; }
   TASKS.push({
-    id: uid(), name, status:'completed',
+    id: uid(), name, status:'completed', category: pastCatCtrl.get(),
     segments:[{start, end, day: dayOf(start)}],
     steps:[]
   });
@@ -2429,6 +2476,7 @@ function openInput(title, desc, placeholder, onConfirm){
 // forced automatically.
 let _nextCloseStatus = null;
 const nextBackCtrl = wireBackTimeControl('nextBack', ()=>document.getElementById('nextConfirmNew').click());
+const nextCatCtrl = wireCatPicker('nextTask');
 function openNextSheet(closeStatus, title){
   _nextCloseStatus = closeStatus;
   document.getElementById('nextTitle').textContent = title;
@@ -2438,6 +2486,7 @@ function openNextSheet(closeStatus, title){
   resumeTab.textContent = pend.length ? `استكمال مهمة معلّقة (${pend.length})` : 'لا توجد مهام معلّقة';
   document.getElementById('nextNameField').value = '';
   nextBackCtrl.reset();
+  nextCatCtrl.reset();
   const others = otherActive();
   document.getElementById('nextStopLbl').textContent = others.length ? `بدون جديد — أكمل على «${others[0].name}»` : 'توقفت عن التسجيل';
   switchNextMode('new');
@@ -2468,7 +2517,7 @@ document.querySelectorAll('#nextTabs .mode-tab').forEach(b=>{
 document.getElementById('nextConfirmNew').addEventListener('click', ()=>{
   const name = document.getElementById('nextNameField').value.trim();
   if(!name) return;
-  closeCurrentAndProceed(_nextCloseStatus, {type:'new', name, backMinutes: nextBackCtrl.get()});
+  closeCurrentAndProceed(_nextCloseStatus, {type:'new', name, backMinutes: nextBackCtrl.get(), category: nextCatCtrl.get()});
   closeOverlay('overlayNext');
 });
 document.getElementById('nextNameField').addEventListener('keydown', (e)=>{
@@ -2566,15 +2615,26 @@ function openStartChoice(next, label){
 // "+ parallel task" from the now card: name a new one, or pick a pending one.
 function openParallelSheet(){
   const pend = pendingTasks();
-  openInput('مهمة موازية', 'تبقى المهمة الحالية تعمل، وتبدأ هذه معها', 'اسم المهمة', (name)=>{ selectedDay = todayStr(); startParallelNew(name); });
+  let catCtrl = null;
+  openInput('مهمة موازية', 'تبقى المهمة الحالية تعمل، وتبدأ هذه معها', 'اسم المهمة', (name)=>{
+    selectedDay = todayStr();
+    startParallelNew(name, catCtrl ? catCtrl.get() : 'work');
+  });
   const wrap = document.getElementById('inputExtra');
-  wrap.innerHTML = pend.length ? `
+  wrap.innerHTML = `
+    <div class="cat-picker" id="parallelCat" style="margin-top:12px;">
+      <button type="button" class="cat-pill active" data-cat="work">عمل</button>
+      <button type="button" class="cat-pill" data-cat="rest">راحة</button>
+      <button type="button" class="cat-pill" data-cat="waste">هدر</button>
+    </div>
+  ` + (pend.length ? `
     <div class="pending-stack-lbl" style="margin:14px 0 8px;">أو استكمل معلّقة بالتوازي</div>
     ${pend.map(t=>`
       <button class="pending-chip" data-par="${t.id}" style="margin-bottom:7px;">
         <span class="pc-name">${escapeHtml(t.name)}</span>
         <span class="pc-meta mono">${fmtDur(taskTotalMs(t))}</span>
-      </button>`).join('')}` : '';
+      </button>`).join('')}` : '');
+  catCtrl = wireCatPicker('parallel');
   wrap.querySelectorAll('[data-par]').forEach(b=>{
     b.onclick = ()=>{ closeOverlay('overlayInput'); selectedDay = todayStr(); startParallelResume(b.dataset.par); };
   });
