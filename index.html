@@ -691,6 +691,10 @@ if('serviceWorker' in navigator){
   <div class="sheet">
     <h3 id="nextTitle">—</h3>
     <p class="desc" id="nextDesc">اختر ماذا تريد أن تبدأ الآن</p>
+    <div id="nextDurWrap" style="margin-bottom:14px; padding-bottom:14px; border-bottom:1px dashed var(--border);">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">مدة هذه الجلسة (دقيقة) — عدّلها إذا احتجت</div>
+      <input type="number" min="1" class="name-input" id="nextDurField" style="margin-bottom:0;">
+    </div>
     <div class="mode-tabs" id="nextTabs">
       <button class="mode-tab active" data-mode="new">مهمة جديدة</button>
       <button class="mode-tab" data-mode="resume" id="nextResumeTab">استكمال مهمة معلّقة</button>
@@ -741,7 +745,9 @@ if('serviceWorker' in navigator){
       <input type="datetime-local" step="1" class="name-input" id="statusStartField" style="margin-bottom:10px;">
       <div id="statusEndWrap">
         <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">النهاية</div>
-        <input type="datetime-local" step="1" class="name-input" id="statusEndField" style="margin-bottom:0;">
+        <input type="datetime-local" step="1" class="name-input" id="statusEndField" style="margin-bottom:8px;">
+        <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">أو المدة (دقيقة)</div>
+        <input type="number" min="1" class="name-input" id="statusDurationField" style="margin-bottom:0;">
       </div>
     </div>
     <button class="btn btn-primary btn-block" id="statusSaveAll" style="margin:14px 0 16px;">حفظ</button>
@@ -1286,13 +1292,21 @@ function addSubStep(text){
 function closeCurrentAndProceed(closeStatus, next){
   const cur = activeTask();
   let boundary = nowISO();
+  if(cur){
+    const durField = document.getElementById('nextDurField');
+    const mins = parseInt(durField && durField.value, 10);
+    if(mins > 0){
+      const startMs = new Date(lastSegment(cur).start).getTime();
+      boundary = new Date(Math.min(Date.now(), startMs + mins*60000)).toISOString();
+    }
+  }
   if(next.type==='new' && next.backMinutes>0){
     let backMs = next.backMinutes*60000;
     if(cur){
-      const maxBackMs = Date.now() - new Date(lastSegment(cur).start).getTime();
+      const maxBackMs = new Date(boundary).getTime() - new Date(lastSegment(cur).start).getTime();
       backMs = Math.min(backMs, Math.max(0, maxBackMs));
     }
-    boundary = new Date(Date.now() - backMs).toISOString();
+    boundary = new Date(new Date(boundary).getTime() - backMs).toISOString();
   }
   if(cur){
     lastSegment(cur).end = boundary;
@@ -2380,6 +2394,31 @@ function pastRecalcEnd(){
   document.getElementById('pastEndField').value = toLocalInput(end.toISOString());
   _pastSyncing = false;
 }
+let _statusSyncing = false;
+function statusRecalcDuration(){
+  if(_statusSyncing) return;
+  const s = document.getElementById('statusStartField').value;
+  const e = document.getElementById('statusEndField').value;
+  if(!s || !e) return;
+  const ms = new Date(e) - new Date(s);
+  _statusSyncing = true;
+  document.getElementById('statusDurationField').value = ms > 0 ? Math.round(ms/60000) : '';
+  _statusSyncing = false;
+}
+function statusRecalcEnd(){
+  if(_statusSyncing) return;
+  const s = document.getElementById('statusStartField').value;
+  const mins = parseInt(document.getElementById('statusDurationField').value, 10);
+  if(!s || !mins) return;
+  const end = new Date(s);
+  end.setMinutes(end.getMinutes() + mins);
+  _statusSyncing = true;
+  document.getElementById('statusEndField').value = toLocalInput(end.toISOString());
+  _statusSyncing = false;
+}
+document.getElementById('statusStartField').addEventListener('input', statusRecalcDuration);
+document.getElementById('statusEndField').addEventListener('input', statusRecalcDuration);
+document.getElementById('statusDurationField').addEventListener('input', statusRecalcEnd);
 document.getElementById('pastStartField').addEventListener('input', pastRecalcDuration);
 document.getElementById('pastEndField').addEventListener('input', pastRecalcDuration);
 document.getElementById('pastDurationField').addEventListener('input', pastRecalcEnd);
@@ -2517,6 +2556,15 @@ const nextCatCtrl = wireCatPicker('nextTask');
 function openNextSheet(closeStatus, title){
   _nextCloseStatus = closeStatus;
   document.getElementById('nextTitle').textContent = title;
+  const cur = activeTask();
+  const durField = document.getElementById('nextDurField');
+  if(cur){
+    const mins = Math.max(1, Math.round((Date.now() - new Date(lastSegment(cur).start).getTime())/60000));
+    durField.value = mins;
+    document.getElementById('nextDurWrap').style.display = '';
+  }else{
+    document.getElementById('nextDurWrap').style.display = 'none';
+  }
   const pend = pendingTasks();
   const resumeTab = document.getElementById('nextResumeTab');
   resumeTab.disabled = pend.length===0;
@@ -2570,7 +2618,14 @@ document.getElementById('nextStopDay').addEventListener('click', ()=>{
 function stopForToday(closeStatus){
   const cur = activeTask();
   if(cur){
-    lastSegment(cur).end = nowISO();
+    let boundary = nowISO();
+    const durField = document.getElementById('nextDurField');
+    const mins = parseInt(durField && durField.value, 10);
+    if(mins > 0){
+      const startMs = new Date(lastSegment(cur).start).getTime();
+      boundary = new Date(Math.min(Date.now(), startMs + mins*60000)).toISOString();
+    }
+    lastSegment(cur).end = boundary;
     cur.status = closeStatus;
   }
   const stillRunning = activeTasks().length > 0;
@@ -2694,6 +2749,7 @@ function openStatusEdit(id){
   if(seg.end){
     endWrap.style.display = '';
     endField.value = toLocalInput(seg.end);
+    statusRecalcDuration();
   }else{
     endWrap.style.display = 'none';
   }
