@@ -337,6 +337,7 @@ body{
   padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
   box-shadow:0 -3px 0 rgba(0,0,0,.35);
 }
+.cat-dot{display:inline-block; width:8px; height:8px; border-radius:50%; flex-shrink:0;}
 .cat-picker{display:flex; gap:6px; margin-bottom:10px;}
 .cat-pill{
   flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
@@ -1754,6 +1755,8 @@ function chartsRangeHTML(days, period){
 
   const peakSection = `<section class="ch-block"><h3>متى تركّز أفضل؟</h3>${chartPeakHours(days)}</section>`;
 
+  const catSection = `<section class="ch-block"><h3>عمل أم راحة أم هدر؟</h3>${chartCategoryMix(days)}</section>`;
+
   const top5 = Array.from(byTask.entries()).sort((a,b)=>b[1]-a[1]).slice(0,5)
     .map(([id,ms])=>{ const t=TASKS.find(x=>x.id===id); return t ? {n:fmtHM(ms), l:escapeHtml(t.name)} : null; })
     .filter(Boolean);
@@ -1762,13 +1765,41 @@ function chartsRangeHTML(days, period){
       <div class="ch-toptasks">${top5.map(x=>`<div class="ch-toprow"><span>${x.l}</span><b class="mono">${x.n}</b></div>`).join('')}</div>
     </section>` : '';
 
-  return summary + dailyChart + peakSection + topTasks;
+  return summary + dailyChart + catSection + peakSection + topTasks;
+}
+
+/* work / rest / waste breakdown, reusing the same stacked-bar look as focus-mix */
+function chartCategoryMix(days){
+  const daySet = new Set(days);
+  const sums = {work:0, rest:0, waste:0};
+  TASKS.forEach(t=>{
+    const cat = (t.category==='rest'||t.category==='waste') ? t.category : 'work';
+    t.segments.forEach(seg=>{
+      if(!daySet.has(seg.day)) return;
+      const end = seg.end ? new Date(seg.end) : new Date();
+      sums[cat] += (end - new Date(seg.start));
+    });
+  });
+  const tot = sums.work + sums.rest + sums.waste;
+  if(!tot) return chartEmpty('لا توجد بيانات بعد');
+  const parts = [
+    {k:'work', l:'عمل', c:'var(--blue)'},
+    {k:'rest', l:'راحة', c:'var(--green)'},
+    {k:'waste', l:'هدر', c:'var(--rose)'},
+  ];
+  const pct = k => Math.round(sums[k]/tot*100);
+  return `
+    <div class="ch-stack">${parts.filter(p=>sums[p.k]>0).map(p=>`<span style="flex:${sums[p.k]}; background:${p.c}" title="${p.l}: ${fmtHM(sums[p.k])}"></span>`).join('')}</div>
+    <div class="ch-stack-legend">${parts.map(p=>`
+      <div><i style="background:${p.c}"></i><span class="l">${p.l}</span><b class="mono">${pct(p.k)}%</b><span class="n">${fmtHM(sums[p.k])}</span></div>`).join('')}
+    </div>`;
 }
 
 function chartsHTML(day){
   const segs = chartSegs(day);
   return `
     <section class="ch-block"><h3>إيقاع اليوم</h3>${chartRhythmTake(day, segs)}${chartGantt(day, segs)}</section>
+    <section class="ch-block"><h3>عمل أم راحة أم هدر؟</h3>${chartCategoryMix([day])}</section>
     <section class="ch-block"><h3>تركيز أم تشتّت؟</h3>${chartFocusMix(day, segs)}</section>
     <section class="ch-block"><h3>الحلقات المفتوحة</h3>${chartOpenLoops()}</section>
     <section class="ch-block"><h3>أغلقت أم تركت؟ — آخر ٧ أيام</h3>${chartClosure(day)}</section>
@@ -1951,7 +1982,7 @@ function renderNowCard(t, isLast){
   return `
     <div class="now-card" data-card="${t.id}">
       <div class="now-top">
-        <div class="now-title">${escapeHtml(t.name)}</div>
+        <div class="now-title">${catDotHTML(t.category)} ${escapeHtml(t.name)}</div>
         <button class="tl-edit" data-fullscreen="${t.id}" title="ملء الشاشة" style="inset-inline-end:34px;">
           <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3"></path><path d="M21 8V5a2 2 0 0 0-2-2h-3"></path><path d="M3 16v3a2 2 0 0 0 2 2h3"></path><path d="M16 21h3a2 2 0 0 0 2-2v-3"></path></svg>
         </button>
@@ -2110,6 +2141,7 @@ function renderTimelineItem(row){
       ${threadIn}
       <div class="tl-top">
         <div class="tl-name-row">
+          ${catDotHTML(t.category)}
           <div class="tl-name">${escapeHtml(t.name)}</div>
         </div>
       </div>
@@ -2169,6 +2201,11 @@ function escapeHtml(s){
 
 /* ---- reusable "how long have you actually been on this?" control ---- */
 const CAT_LABELS = {work:'عمل', rest:'راحة', waste:'هدر'};
+const CAT_COLORS = {work:'var(--blue)', rest:'var(--green)', waste:'var(--rose)'};
+function catDotHTML(category){
+  const c = category || 'work';
+  return `<span class="cat-dot" style="background:${CAT_COLORS[c]}" title="${CAT_LABELS[c]}"></span>`;
+}
 function categoryPickerHTML(prefix){
   return `
     <div class="cat-picker" id="${prefix}Cat">
