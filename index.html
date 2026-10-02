@@ -345,6 +345,9 @@ body{
   transition:transform .08s;
 }
 .cat-pill.active{background:var(--amber); color:#07211D; border-color:var(--amber);}
+.cat-pill[data-cat="work"].active{background:var(--blue); border-color:var(--blue); color:#071A2E;}
+.cat-pill[data-cat="rest"].active{background:var(--green); border-color:var(--green); color:#062414;}
+.cat-pill[data-cat="waste"].active{background:var(--rose); border-color:var(--rose); color:#330910;}
 .cat-pill:active{transform:scale(.94);}
 .period-tabs{display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;}
 .period-tab{
@@ -692,7 +695,9 @@ if('serviceWorker' in navigator){
     <h3 id="nextTitle">—</h3>
     <p class="desc" id="nextDesc">اختر ماذا تريد أن تبدأ الآن</p>
     <div id="nextDurWrap" style="margin-bottom:14px; padding-bottom:14px; border-bottom:1px dashed var(--border);">
-      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">مدة هذه الجلسة (دقيقة) — عدّلها إذا احتجت</div>
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">انتهت الساعة — عدّلها إذا احتجت</div>
+      <input type="datetime-local" step="1" class="name-input" id="nextEndField" style="margin-bottom:8px;">
+      <div style="font-size:11px; color:var(--muted-2); margin-bottom:4px;">أو المدة (دقيقة)</div>
       <input type="number" min="1" class="name-input" id="nextDurField" style="margin-bottom:0;">
     </div>
     <div class="mode-tabs" id="nextTabs">
@@ -1293,11 +1298,9 @@ function closeCurrentAndProceed(closeStatus, next){
   const cur = activeTask();
   let boundary = nowISO();
   if(cur){
-    const durField = document.getElementById('nextDurField');
-    const mins = parseInt(durField && durField.value, 10);
-    if(mins > 0){
-      const startMs = new Date(lastSegment(cur).start).getTime();
-      boundary = new Date(Math.min(Date.now(), startMs + mins*60000)).toISOString();
+    const endField = document.getElementById('nextEndField');
+    if(endField && endField.value){
+      boundary = new Date(Math.min(Date.now(), new Date(endField.value).getTime())).toISOString();
     }
   }
   if(next.type==='new' && next.backMinutes>0){
@@ -2097,9 +2100,9 @@ function renderEmptyNow(){
         <input type="text" class="now-title-input" id="firstTaskInput" placeholder="ما الذي تفعله الآن؟" autocomplete="off">
       </div>
       <div class="flip-clock">${flipClockHTML(0)}</div>
-      ${categoryPickerHTML('firstTask')}
       <div class="start-row">
         ${backTimeControlHTML('firstTaskBack')}
+        ${categoryPickerHTML('firstTask')}
         <button class="btn btn-primary" id="firstTaskBtn">بدء التسجيل</button>
       </div>
       ${pendingStackHTML()}
@@ -2551,16 +2554,41 @@ function openInput(title, desc, placeholder, onConfirm){
 // new task or the resumption of one that was already pending — nothing is
 // forced automatically.
 let _nextCloseStatus = null;
+let _nextSyncing = false;
+function nextRecalcDuration(){
+  if(_nextSyncing) return;
+  const cur = activeTask();
+  if(!cur) return;
+  const e = document.getElementById('nextEndField').value;
+  if(!e) return;
+  const ms = new Date(e) - new Date(lastSegment(cur).start);
+  _nextSyncing = true;
+  document.getElementById('nextDurField').value = ms > 0 ? Math.round(ms/60000) : '';
+  _nextSyncing = false;
+}
+function nextRecalcEnd(){
+  if(_nextSyncing) return;
+  const cur = activeTask();
+  if(!cur) return;
+  const mins = parseInt(document.getElementById('nextDurField').value, 10);
+  if(!mins) return;
+  const end = new Date(lastSegment(cur).start);
+  end.setMinutes(end.getMinutes() + mins);
+  _nextSyncing = true;
+  document.getElementById('nextEndField').value = toLocalInput(end.toISOString());
+  _nextSyncing = false;
+}
+document.getElementById('nextEndField').addEventListener('input', nextRecalcDuration);
+document.getElementById('nextDurField').addEventListener('input', nextRecalcEnd);
 const nextBackCtrl = wireBackTimeControl('nextBack', ()=>document.getElementById('nextConfirmNew').click());
 const nextCatCtrl = wireCatPicker('nextTask');
 function openNextSheet(closeStatus, title){
   _nextCloseStatus = closeStatus;
   document.getElementById('nextTitle').textContent = title;
   const cur = activeTask();
-  const durField = document.getElementById('nextDurField');
   if(cur){
-    const mins = Math.max(1, Math.round((Date.now() - new Date(lastSegment(cur).start).getTime())/60000));
-    durField.value = mins;
+    document.getElementById('nextEndField').value = toLocalInput(nowISO());
+    nextRecalcDuration();
     document.getElementById('nextDurWrap').style.display = '';
   }else{
     document.getElementById('nextDurWrap').style.display = 'none';
@@ -2619,11 +2647,9 @@ function stopForToday(closeStatus){
   const cur = activeTask();
   if(cur){
     let boundary = nowISO();
-    const durField = document.getElementById('nextDurField');
-    const mins = parseInt(durField && durField.value, 10);
-    if(mins > 0){
-      const startMs = new Date(lastSegment(cur).start).getTime();
-      boundary = new Date(Math.min(Date.now(), startMs + mins*60000)).toISOString();
+    const endField = document.getElementById('nextEndField');
+    if(endField && endField.value){
+      boundary = new Date(Math.min(Date.now(), new Date(endField.value).getTime())).toISOString();
     }
     lastSegment(cur).end = boundary;
     cur.status = closeStatus;
