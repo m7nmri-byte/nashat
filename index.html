@@ -349,6 +349,7 @@ body{
 .cat-pill[data-cat="rest"].active{background:var(--green); border-color:var(--green); color:#062414;}
 .cat-pill[data-cat="waste"].active{background:var(--rose); border-color:var(--rose); color:#330910;}
 .cat-pill:active{transform:scale(.94);}
+.start-row .cat-picker{margin:0; justify-content:center;}
 .period-tabs{display:flex; gap:6px; margin-bottom:14px; overflow-x:auto;}
 .period-tab{
   flex:1; background:var(--surface-2); border:1px solid var(--border); color:var(--muted);
@@ -1217,7 +1218,7 @@ function daySegments(day){
 }
 
 function pendingTasks(){
-  return TASKS.filter(t=>t.status==='interrupted').sort((a,b)=>{
+  return TASKS.filter(t=>t.status==='interrupted' && !t.dismissed).sort((a,b)=>{
     const la = lastSegment(a), lb = lastSegment(b);
     return new Date(lb.end) - new Date(la.end);
   });
@@ -1274,7 +1275,7 @@ function startParallelResume(id){
   const t = TASKS.find(x=>x.id===id);
   if(!t || activeTasks().length >= MAX_PARALLEL) return;
   t.segments.push({start: nowISO(), end:null, day: todayStr()});
-  t.status = 'active';
+  t.status = 'active'; delete t.dismissed;
   persist();
   toast('استُؤنفت بالتوازي: ' + t.name);
 }
@@ -1321,11 +1322,12 @@ function closeCurrentAndProceed(closeStatus, next){
     const t = TASKS.find(x=>x.id===next.id);
     if(t){
       t.segments.push({start: nowISO(), end:null, day: todayStr()});
-      t.status = 'active';
+      t.status = 'active'; delete t.dismissed;
     }
   }
   persist();
   toast(closeStatus==='completed' ? 'تم إنهاء المهمة والانتقال' : 'تم تسجيل المقاطعة والانتقال');
+  if(cur && closeStatus==='completed') setTimeout(()=>openStatusEdit(cur.id), 250);
 }
 
 // Used only when there is no current active task (e.g. start of day) and
@@ -1334,7 +1336,7 @@ function resumeFromEmpty(id){
   const t = TASKS.find(x=>x.id===id);
   if(!t) return;
   t.segments.push({start: nowISO(), end:null, day: todayStr()});
-  t.status = 'active';
+  t.status = 'active'; delete t.dismissed;
   persist();
   toast('تم استئناف: ' + t.name);
 }
@@ -1826,7 +1828,7 @@ function chartsHTML(day){
 
 document.addEventListener('click', e=>{
   const b = e.target.closest('[data-ch-resume]');
-  if(b) quickResume(b.dataset.chResume);
+  if(b) openPendingActions(b.dataset.chResume);
 });
 
 function refreshCharts(){
@@ -2039,7 +2041,7 @@ function pendingStackHTML(){
 }
 function wirePendingStack(root){
   root.querySelectorAll('.pending-chip').forEach(b=>{
-    b.onclick = ()=> quickResume(b.dataset.id);
+    b.onclick = ()=> openPendingActions(b.dataset.id);
   });
 }
 
@@ -2656,6 +2658,7 @@ function stopForToday(closeStatus){
   }
   const stillRunning = activeTasks().length > 0;
   persist();
+  if(cur && closeStatus==='completed') setTimeout(()=>openStatusEdit(cur.id), 250);
   if(stillRunning) toast(closeStatus==='completed' ? 'سُجّلت كمُنجزة — والأخرى مستمرة' : 'سُجّلت كمقاطَعة — والأخرى مستمرة');
   else toast(closeStatus==='completed' ? 'تم التوقف عن التسجيل — آخر مهمة سُجّلت كمُنجزة' : 'تم التوقف عن التسجيل — آخر مهمة سُجّلت كمقاطَعة');
 }
@@ -2680,6 +2683,26 @@ function openResumeList(){
 // hasn't been completed yet, from any day, one tap away from anywhere.
 // If nothing is currently running, resume right away; otherwise ask, in one
 // extra tap, how the current task should be recorded before switching.
+function openPendingActions(id){
+  const t = TASKS.find(x=>x.id===id);
+  if(!t) return;
+  document.getElementById('closeChoiceTitle').textContent = t.name;
+  const wrap = document.getElementById('closeChoiceOptions');
+  wrap.innerHTML = `
+    <button class="option-btn" data-pa="resume"><span class="ic">▶</span><span class="t"><span class="h">ابدأ فيها الآن</span></span></button>
+    <button class="option-btn" data-pa="done"><span class="ic">✓</span><span class="t"><span class="h">سجّلها مكتملة</span></span></button>
+    <button class="option-btn" data-pa="drop"><span class="ic">✕</span><span class="t"><span class="h">لا أريد إكمالها</span><span class="s">تخرج من المعلّقة وتبقى في السجل</span></span></button>`;
+  openOverlay('overlayCloseChoice');
+  wrap.querySelectorAll('[data-pa]').forEach(b=>{
+    b.onclick = ()=>{
+      closeOverlay('overlayCloseChoice');
+      const a = b.dataset.pa;
+      if(a==='resume') quickResume(id);
+      else if(a==='done') setTaskStatus(id,'completed');
+      else { t.dismissed = true; persist(); toast('أُزيلت من المعلّقة'); }
+    };
+  });
+}
 function quickResume(id){
   closeOverlay('overlayPending');
   if(!activeTasks().length){ resumeFromEmpty(id); return; }
